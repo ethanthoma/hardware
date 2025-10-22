@@ -1,0 +1,36 @@
+[project]
+name = "hardware"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "amaranth[builtin-yosys]>=0.5.8",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+main = "main:main"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["I", "W"]
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[tool.ty.environment]
+python = "./.venv"
+
+[tool.uv.sources]
+amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
