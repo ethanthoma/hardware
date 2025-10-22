@@ -34,3 +34,8 @@ python = "./.venv"
 
 [tool.uv.sources]
 amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
