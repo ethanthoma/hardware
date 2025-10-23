@@ -23,6 +23,11 @@ class BF16Multiplier(wiring.Component):
         b_exp = self.b.exponent
         b_mant = self.b.mantissa
 
+        # ---- Special case detection ----
+        a_is_zero = (a_exp == 0) & (a_mant == 0)
+        b_is_zero = (b_exp == 0) & (b_mant == 0)
+        either_zero = a_is_zero | b_is_zero
+
         # ---- Result Sign ----
         result_sign = a_sign ^ b_sign
 
@@ -42,7 +47,7 @@ class BF16Multiplier(wiring.Component):
         normalized_mant = Signal(8)
         normalized_exp = Signal(8)
 
-        with m.If(mant_product[15]):  # Overflow
+        with m.If(mant_product[15]):  # Overflow: shift right by 1
             m.d.comb += [
                 normalized_mant.eq(mant_product[8:16]),
                 normalized_exp.eq(exp_sum + 1),
@@ -53,11 +58,18 @@ class BF16Multiplier(wiring.Component):
                 normalized_exp.eq(exp_sum),
             ]
 
-        # ---- Pack ----
-        m.d.comb += [
-            self.result.mantissa.eq(normalized_mant[0:7]),
-            self.result.exponent.eq(normalized_exp),
-            self.result.sign.eq(result_sign),
-        ]
+        # ---- Pack Result ----
+        with m.If(either_zero):  # result is zero
+            m.d.comb += [
+                self.result.mantissa.eq(0),
+                self.result.exponent.eq(0),
+                self.result.sign.eq(result_sign),
+            ]
+        with m.Else():
+            m.d.comb += [
+                self.result.mantissa.eq(normalized_mant[0:7]),
+                self.result.exponent.eq(normalized_exp),
+                self.result.sign.eq(result_sign),
+            ]
 
         return m
