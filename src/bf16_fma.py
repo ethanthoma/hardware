@@ -142,8 +142,11 @@ class BF16_FMA(wiring.Component):
                 m.d.comb += sum_mant_adjusted.eq(sum_mant[1:27])
                 m.d.comb += exp_adjustment.eq(1)
             with m.Else():  # No overflow: check for leading zeros
-                m.d.comb += lza.a.eq(product_mant_extended)
-                m.d.comb += lza.b.eq(Mux(signs_match, c_mant_extended, ~c_mant_extended))
+                larger_mant = Mux(product_mant_extended >= c_mant_extended, product_mant_extended, c_mant_extended)
+                smaller_mant = Mux(product_mant_extended >= c_mant_extended, c_mant_extended, product_mant_extended)
+
+                m.d.comb += lza.a.eq(larger_mant)
+                m.d.comb += lza.b.eq(Mux(signs_match, smaller_mant, ~smaller_mant))
                 m.d.comb += lza.carry_in.eq(~signs_match)
 
                 lz_count = Signal(5)
