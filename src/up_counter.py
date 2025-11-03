@@ -1,4 +1,5 @@
 from amaranth import *
+from amaranth.build import Platform
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
@@ -13,7 +14,7 @@ class UpCounter(wiring.Component):
 
         super().__init__()
 
-    def elaborate(self, platform) -> Module:
+    def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
 
         m.d.comb += self.ovf.eq(self.count == self.limit)

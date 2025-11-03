@@ -1,4 +1,5 @@
 from amaranth import *
+from amaranth.build import Platform
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
@@ -11,7 +12,7 @@ class BF16Multiplier(wiring.Component):
     b: In(BFloat16)
     result: Out(BFloat16)
 
-    def elaborate(self, platform) -> Module:
+    def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
 
         # ---- Unpack ----

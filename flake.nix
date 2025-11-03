@@ -66,7 +66,8 @@
           devshells.default = {
             packages = [
               pkgs.ruff
-              pkgs.ty
+              #pkgs.ty
+              pkgs.pyrefly
             ];
 
             env = [
