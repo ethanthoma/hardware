@@ -6,8 +6,13 @@ from amaranth.lib.wiring import In, Out
 from bfloat16 import BFloat16
 
 
-# https://ieeexplore.ieee.org/document/9298120
 class BF16Multiplier(wiring.Component):
+    """BFloat16 multiplier: result = a * b
+
+    Based on Hutchins & Swartzlander (2020)
+    - https://ieeexplore.ieee.org/document/9298120
+    """
+
     a: In(BFloat16)
     b: In(BFloat16)
     result: Out(BFloat16)

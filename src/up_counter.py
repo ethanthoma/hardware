@@ -5,6 +5,8 @@ from amaranth.lib.wiring import In, Out
 
 
 class UpCounter(wiring.Component):
+    """Up counter with overflow flag"""
+
     en: In(1)
     ovf: Out(1)
 
@@ -17,8 +19,10 @@ class UpCounter(wiring.Component):
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
 
+        # ---- Overflow Detection ----
         m.d.comb += self.ovf.eq(self.count == self.limit)
 
+        # ---- Counter Logic ----
         with m.If(self.en):
             with m.If(self.ovf):
                 m.d.sync += self.count.eq(0)
