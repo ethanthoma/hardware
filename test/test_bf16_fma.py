@@ -236,6 +236,8 @@ def test_fma_edge_cases(request):
         (1.0, 2.0, 4.0, 6.0),
         # Identity: 1.0 * x + 0.0 = x
         (1.0, 5.0, 0.0, 5.0),
+        # LZA bug test: product=2.0, c=-5.0 should give -3.0
+        (1.0, 2.0, -5.0, -3.0),  # 1.0 * 2.0 + (-5.0) = 2.0 - 5.0 = -3.0
     ]
 
     async def bench(ctx):
