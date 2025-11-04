@@ -7,7 +7,7 @@ TIMING_BUDGETS = {
     "carry_select_26": 16.0,
     "kogge_stone_26": 11.0,
     "lza_26": 18.0,
-    "bf16_adder_optimized": 125.0,
+    "bf16_adder_optimized": 110.0,
 }
 
 TIMING_TARGETS = {
@@ -39,10 +39,17 @@ def analyze_lza(width):
     return gp_generation + kogge_stone + sum_prediction + priority_encoder
 
 
+def analyze_kogge_stone_adder(width):
+    gp_generation = 1
+    kogge_stone = analyze_kogge_stone(width)
+    sum_generation = 1
+    return gp_generation + kogge_stone + sum_generation
+
+
 def analyze_bf16_adder_optimized():
     exp_compare = 3
-    exp_diff = 8
-    abs_value = 8
+    exp_diff = analyze_kogge_stone_adder(8)
+    abs_value = analyze_kogge_stone_adder(8)
     shift_clamp = 2
     alignment = 10
     mag_compare = 9
@@ -50,7 +57,7 @@ def analyze_bf16_adder_optimized():
     lza = analyze_lza(26)
     normalize = 10
     rounding = 10
-    result_exp = 8
+    result_exp = analyze_kogge_stone_adder(9)
     sign_determine = 3
     return (
         exp_compare

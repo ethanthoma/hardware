@@ -8,6 +8,7 @@ from bfloat16 import BFloat16
 from carry_select_adder import CarrySelectAdder, CarrySelectSubtractor
 from lza import LeadingZeroAnticipator
 from normalizer import Normalizer
+from parallel_prefix import KoggeStoneAdder, KoggeStoneSubtractor
 from rounder import Rounder
 
 
@@ -27,6 +28,9 @@ class BF16Adder(wiring.Component):
         m.submodules.rounder = rounder = Rounder(width=7)
         m.submodules.cs_adder = cs_adder = CarrySelectAdder(width=26, block_size=6)
         m.submodules.cs_sub = cs_sub = CarrySelectSubtractor(width=26, block_size=6)
+        m.submodules.ks_exp_sub = ks_exp_sub = KoggeStoneSubtractor(width=8)
+        m.submodules.ks_abs_sub = ks_abs_sub = KoggeStoneSubtractor(width=8)
+        m.submodules.ks_exp_add = ks_exp_add = KoggeStoneAdder(width=9)
 
         a_sign = self.a.sign
         a_exp = self.a.exponent
@@ -67,7 +71,9 @@ class BF16Adder(wiring.Component):
                 m.d.comb += larger_exp.eq(b_exp)
 
             exp_difference = Signal(Shape(9, signed=True))
-            m.d.comb += exp_difference.eq(a_exp - b_exp)
+            m.d.comb += ks_exp_sub.a.eq(a_exp)
+            m.d.comb += ks_exp_sub.b.eq(b_exp)
+            m.d.comb += exp_difference.eq(ks_exp_sub.diff.as_signed())
 
             shift_amt = Signal(5)
             abs_exp_diff = Signal(8)
@@ -75,7 +81,9 @@ class BF16Adder(wiring.Component):
             with m.If(exp_difference >= 0):
                 m.d.comb += abs_exp_diff.eq(exp_difference[0:8])
             with m.Else():
-                m.d.comb += abs_exp_diff.eq(-exp_difference[0:8])
+                m.d.comb += ks_abs_sub.a.eq(0)
+                m.d.comb += ks_abs_sub.b.eq(exp_difference[0:8])
+                m.d.comb += abs_exp_diff.eq(ks_abs_sub.diff)
 
             with m.If(abs_exp_diff > 25):
                 m.d.comb += shift_amt.eq(25)
@@ -169,10 +177,13 @@ class BF16Adder(wiring.Component):
 
                 result_exp = Signal(8)
 
-                with m.If(round_overflow):
-                    m.d.comb += result_exp.eq(larger_exp + exp_adjustment + 1)
-                with m.Else():
-                    m.d.comb += result_exp.eq(larger_exp + exp_adjustment)
+                larger_exp_extended = Signal(9)
+                m.d.comb += larger_exp_extended.eq(larger_exp)
+
+                m.d.comb += ks_exp_add.a.eq(larger_exp_extended)
+                m.d.comb += ks_exp_add.b.eq(exp_adjustment)
+                m.d.comb += ks_exp_add.carry_in.eq(round_overflow)
+                m.d.comb += result_exp.eq(ks_exp_add.sum[0:8])
 
                 result_sign = Signal()
                 with m.If(signs_match):
