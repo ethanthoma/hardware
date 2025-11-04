@@ -1,0 +1,6 @@
+{
+  "carry_select_26": 15,
+  "kogge_stone_26": 10,
+  "lza_26": 17,
+  "bf16_adder_optimized": 103
+}

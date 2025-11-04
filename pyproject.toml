@@ -35,7 +35,7 @@ venvPath = "."
 venv = ".venv"
 
 [tool.ty.environment]
-python = "./.venv"
+python = "./.venv/bin/python"
 
 [tool.uv.sources]
 amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
