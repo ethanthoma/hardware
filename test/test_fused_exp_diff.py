@@ -7,11 +7,9 @@ dut = FusedExponentDifference()
 
 def test_fused_exp_diff_equal_exponents():
     async def bench(ctx):
-        # All exponents equal: (127 + 127 - 127) - 127 = 0
         ctx.set(dut.a_exp, 127)
         ctx.set(dut.b_exp, 127)
         ctx.set(dut.c_exp, 127)
-        await ctx.delay(1e-6)
         exp_diff = ctx.get(dut.exp_diff)
         shift_amt = ctx.get(dut.shift_amount)
 
@@ -31,12 +29,9 @@ def test_fused_exp_diff_equal_exponents():
 
 def test_fused_exp_diff_product_larger():
     async def bench(ctx):
-        # A=2.0 (128), B=2.0 (128), C=1.0 (127)
-        # (128 + 128 - 127) - 127 = 129 - 127 = 2
         ctx.set(dut.a_exp, 128)
         ctx.set(dut.b_exp, 128)
         ctx.set(dut.c_exp, 127)
-        await ctx.delay(1e-6)
         exp_diff = ctx.get(dut.exp_diff)
         shift_amt = ctx.get(dut.shift_amount)
 
@@ -55,12 +50,9 @@ def test_fused_exp_diff_product_larger():
 
 def test_fused_exp_diff_c_larger():
     async def bench(ctx):
-        # A=1.0 (127), B=1.0 (127), C=4.0 (129)
-        # (127 + 127 - 127) - 129 = 127 - 129 = -2
         ctx.set(dut.a_exp, 127)
         ctx.set(dut.b_exp, 127)
         ctx.set(dut.c_exp, 129)
-        await ctx.delay(1e-6)
         exp_diff = ctx.get(dut.exp_diff)
         shift_amt = ctx.get(dut.shift_amount)
 
@@ -79,11 +71,9 @@ def test_fused_exp_diff_c_larger():
 
 def test_fused_exp_diff_large_difference():
     async def bench(ctx):
-        # Large difference should clamp to 25
         ctx.set(dut.a_exp, 200)
         ctx.set(dut.b_exp, 200)
         ctx.set(dut.c_exp, 127)
-        await ctx.delay(1e-6)
         shift_amt = ctx.get(dut.shift_amount)
 
         assert shift_amt == 25, f"Expected clamped shift 25, got {shift_amt}"

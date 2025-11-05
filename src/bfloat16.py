@@ -15,23 +15,35 @@ class BFloat16(data.Struct):
     def is_subnormal(self):
         return self.exponent == 0
 
-    @staticmethod
-    def from_float(f: float) -> int:
-        fp32_bits = struct.unpack(">I", struct.pack(">f", f))[0]
-        return fp32_bits >> 16
 
-    @staticmethod
-    def to_float(bits: int) -> float:
-        fp32_bits = bits << 16
+class BF16:
+    def __init__(self, bits: int):
+        self.bits = bits
+
+    @classmethod
+    def from_float(cls, f: float):
+        fp32_bits = struct.unpack(">I", struct.pack(">f", f))[0]
+        bits = fp32_bits >> 16
+        return cls(bits)
+
+    @classmethod
+    def from_bits(cls, bits: int):
+        return cls(bits)
+
+    def to_bits(self) -> int:
+        return self.bits
+
+    def to_float(self) -> float:
+        fp32_bits = self.bits << 16
         return struct.unpack(">f", struct.pack(">I", fp32_bits))[0]
 
-    @staticmethod
-    def pack(sign: int, exponent: int, mantissa: int) -> int:
-        return (sign << 15) | (exponent << 7) | mantissa
+    def unpack(self) -> tuple[int, int, int]:
+        sign = (self.bits >> 15) & 0x1
+        exp = (self.bits >> 7) & 0xFF
+        mant = self.bits & 0x7F
+        return sign, exp, mant
 
-    @staticmethod
-    def unpack(bits: int) -> tuple[int, int, int]:
-        sign = (bits >> 15) & 0x1
-        exponent = (bits >> 7) & 0xFF
-        mantissa = bits & 0x7F
-        return sign, exponent, mantissa
+    @classmethod
+    def pack(cls, sign: int, exp: int, mant: int):
+        bits = (sign << 15) | (exp << 7) | mant
+        return cls(bits)

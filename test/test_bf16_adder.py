@@ -3,7 +3,7 @@ import sys
 from amaranth.sim import Simulator
 
 import bf16_adder
-import bfloat16
+from bfloat16 import BF16
 
 
 def test_adder_basic_addition(request):
@@ -26,20 +26,18 @@ def test_adder_basic_addition(request):
 
     async def bench(ctx):
         for a_f, b_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
             rel_error = error / abs(expected_f) if expected_f != 0 else error
@@ -77,20 +75,18 @@ def test_adder_different_exponents(request):
 
     async def bench(ctx):
         for a_f, b_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
             rel_error = error / abs(expected_f) if expected_f != 0 else error
@@ -128,20 +124,18 @@ def test_adder_subtraction(request):
 
     async def bench(ctx):
         for a_f, b_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
             rel_error = error / abs(expected_f) if expected_f != 0 else error
@@ -177,20 +171,18 @@ def test_adder_near_cancellation(request):
 
     async def bench(ctx):
         for a_f, b_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
 
@@ -222,20 +214,18 @@ def test_adder_with_zero(request):
 
     async def bench(ctx):
         for a_f, b_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
 

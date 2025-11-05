@@ -3,7 +3,7 @@ import sys
 from amaranth.sim import Simulator
 
 import bf16_fma
-import bfloat16
+from bfloat16 import BF16
 
 
 def test_fma_basic_operations(request):
@@ -26,23 +26,21 @@ def test_fma_basic_operations(request):
 
     async def bench(ctx):
         for a_f, b_f, c_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
-            c_packed = bfloat16.BFloat16.from_float(c_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
+            c = BF16.from_float(c_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
-            c_sign, c_exp, c_mant = bfloat16.BFloat16.unpack(c_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
+            c_sign, c_exp, c_mant = c.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
             ctx.set(dut.c, {"sign": c_sign, "exponent": c_exp, "mantissa": c_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
             rel_error = error / abs(expected_f) if expected_f != 0 else error
@@ -82,23 +80,21 @@ def test_fma_with_zero(request):
 
     async def bench(ctx):
         for a_f, b_f, c_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
-            c_packed = bfloat16.BFloat16.from_float(c_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
+            c = BF16.from_float(c_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
-            c_sign, c_exp, c_mant = bfloat16.BFloat16.unpack(c_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
+            c_sign, c_exp, c_mant = c.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
             ctx.set(dut.c, {"sign": c_sign, "exponent": c_exp, "mantissa": c_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
 
@@ -135,23 +131,21 @@ def test_fma_with_negative(request):
 
     async def bench(ctx):
         for a_f, b_f, c_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
-            c_packed = bfloat16.BFloat16.from_float(c_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
+            c = BF16.from_float(c_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
-            c_sign, c_exp, c_mant = bfloat16.BFloat16.unpack(c_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
+            c_sign, c_exp, c_mant = c.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
             ctx.set(dut.c, {"sign": c_sign, "exponent": c_exp, "mantissa": c_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
             rel_error = error / abs(expected_f) if expected_f != 0 else error
@@ -187,23 +181,21 @@ def test_fma_alignment_cases(request):
 
     async def bench(ctx):
         for a_f, b_f, c_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
-            c_packed = bfloat16.BFloat16.from_float(c_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
+            c = BF16.from_float(c_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
-            c_sign, c_exp, c_mant = bfloat16.BFloat16.unpack(c_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
+            c_sign, c_exp, c_mant = c.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
             ctx.set(dut.c, {"sign": c_sign, "exponent": c_exp, "mantissa": c_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
             rel_error = error / abs(expected_f) if expected_f != 0 else error
@@ -242,23 +234,21 @@ def test_fma_edge_cases(request):
 
     async def bench(ctx):
         for a_f, b_f, c_f, expected_f in test_cases:
-            a_packed = bfloat16.BFloat16.from_float(a_f)
-            b_packed = bfloat16.BFloat16.from_float(b_f)
-            c_packed = bfloat16.BFloat16.from_float(c_f)
+            a = BF16.from_float(a_f)
+            b = BF16.from_float(b_f)
+            c = BF16.from_float(c_f)
 
-            a_sign, a_exp, a_mant = bfloat16.BFloat16.unpack(a_packed)
-            b_sign, b_exp, b_mant = bfloat16.BFloat16.unpack(b_packed)
-            c_sign, c_exp, c_mant = bfloat16.BFloat16.unpack(c_packed)
+            a_sign, a_exp, a_mant = a.unpack()
+            b_sign, b_exp, b_mant = b.unpack()
+            c_sign, c_exp, c_mant = c.unpack()
 
             ctx.set(dut.a, {"sign": a_sign, "exponent": a_exp, "mantissa": a_mant})
             ctx.set(dut.b, {"sign": b_sign, "exponent": b_exp, "mantissa": b_mant})
             ctx.set(dut.c, {"sign": c_sign, "exponent": c_exp, "mantissa": c_mant})
 
             result_struct = ctx.get(dut.result)
-            result_packed = bfloat16.BFloat16.pack(
-                result_struct["sign"], result_struct["exponent"], result_struct["mantissa"]
-            )
-            result_f = bfloat16.BFloat16.to_float(result_packed)
+            result = BF16.pack(result_struct["sign"], result_struct["exponent"], result_struct["mantissa"])
+            result_f = result.to_float()
 
             error = abs(result_f - expected_f)
             rel_error = error / abs(expected_f) if expected_f != 0 else error
