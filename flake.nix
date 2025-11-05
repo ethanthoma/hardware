@@ -91,6 +91,16 @@
                 name = "PATH";
                 eval = "/home/ethanthoma/.local/bin:$PATH";
               }
+
+              {
+                name = "LD_LIBRARY_PATH";
+                eval = "$LD_LIBRARY_PATH:${
+                  inputs.nixpkgs.lib.makeLibraryPath ([
+                    pkgs.stdenv.cc.cc.lib
+                    pkgs.libz
+                  ])
+                }";
+              }
             ];
 
             commands = [

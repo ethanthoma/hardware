@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "amaranth[builtin-yosys]>=0.5.8",
+    "numpy>=2.3.4",
 ]
 
 [dependency-groups]
