@@ -5,12 +5,6 @@ from amaranth.lib.wiring import In, Out
 
 
 class KoggeStone(wiring.Component):
-    """Kogge-Stone parallel prefix network for carry computation
-
-    Computes all carries in O(log n) delay vs O(n) ripple-carry
-    For 26-bit: log2(26) = 5 levels ~= 10Δ vs 26Δ ripple
-    """
-
     def __init__(self, width: int = 26):
         self.width = width
 
@@ -54,8 +48,6 @@ class KoggeStone(wiring.Component):
 
 
 class KoggeStoneAdder(wiring.Component):
-    """Kogge-Stone Adder: O(log n) delay for fast addition"""
-
     def __init__(self, width: int = 8):
         self.width = width
 
@@ -94,8 +86,6 @@ class KoggeStoneAdder(wiring.Component):
 
 
 class KoggeStoneSubtractor(wiring.Component):
-    """Kogge-Stone Subtractor: a - b via two's complement"""
-
     def __init__(self, width: int = 8):
         self.width = width
 

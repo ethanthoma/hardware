@@ -5,12 +5,6 @@ from amaranth.lib.wiring import In, Out
 
 
 class Aligner(wiring.Component):
-    """Barrel shifter for mantissa alignment (right-shift)
-
-    - Delay: 2*log2(width) gate delays (2-delta per mux stage)
-    - For BF16 FMA: 26-bit width, 10-delta delay
-    """
-
     def __init__(self, width: int = 26):
         self.width = width
         self.shift_bits = (width - 1).bit_length()
@@ -25,8 +19,5 @@ class Aligner(wiring.Component):
 
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
-
-        # ---- Right Shift ----
         m.d.comb += self.value_out.eq(self.value_in >> self.shift_amount)
-
         return m

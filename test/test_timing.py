@@ -8,13 +8,15 @@ TIMING_BUDGETS = {
     "kogge_stone_26": 11.0,
     "lza_26": 18.0,
     "bf16_adder_optimized": 110.0,
+    "bf16_fma": 75.0,
 }
 
 TIMING_TARGETS = {
     "carry_select_26": 15.0,
     "kogge_stone_26": 10.0,
     "lza_26": 17.0,
-    "bf16_adder_optimized": 28.0,
+    "bf16_adder_optimized": 69.0,
+    "bf16_fma": 69.0,
 }
 
 
@@ -75,6 +77,25 @@ def analyze_bf16_adder_optimized():
     )
 
 
+def analyze_bf16_fma():
+    mult_8x8 = 10
+    fused_exp_diff = analyze_kogge_stone_adder(10)
+    parallel_path = max(mult_8x8, fused_exp_diff)
+
+    alignment = 10
+
+    addition = analyze_carry_select_adder(26, 6)
+    lza_delay = analyze_lza(26)
+    add_lza_parallel = max(addition, lza_delay)
+    normalize = 10
+
+    rounding = analyze_kogge_stone_adder(7)
+    exp_adjustment = analyze_kogge_stone_adder(9)
+    sign_determine = 2
+
+    return parallel_path + alignment + add_lza_parallel + normalize + rounding + exp_adjustment + sign_determine
+
+
 def test_carry_select_timing(request):
     delay = analyze_carry_select_adder(width=26, block_size=6)
     request.node.timing_info = f"{delay}-delta (target: {TIMING_TARGETS['carry_select_26']}-delta, budget: {TIMING_BUDGETS['carry_select_26']}-delta)"
@@ -107,6 +128,14 @@ def test_bf16_adder_timing(request):
     )
 
 
+def test_bf16_fma_timing(request):
+    delay = analyze_bf16_fma()
+    request.node.timing_info = (
+        f"{delay}-delta (target: {TIMING_TARGETS['bf16_fma']}-delta, budget: {TIMING_BUDGETS['bf16_fma']}-delta)"
+    )
+    assert delay <= TIMING_BUDGETS["bf16_fma"], f"BF16 FMA: {delay}-delta > {TIMING_BUDGETS['bf16_fma']}-delta"
+
+
 def test_no_timing_regressions(tmp_path):
     baseline_file = Path(__file__).parent / "timing_baseline.json"
 
@@ -115,6 +144,7 @@ def test_no_timing_regressions(tmp_path):
         "kogge_stone_26": analyze_kogge_stone(26),
         "lza_26": analyze_lza(26),
         "bf16_adder_optimized": analyze_bf16_adder_optimized(),
+        "bf16_fma": analyze_bf16_fma(),
     }
 
     if baseline_file.exists():

@@ -13,8 +13,6 @@ from rounder import Rounder
 
 
 class BF16Adder(wiring.Component):
-    """BFloat16 Adder: result = a + b"""
-
     a: In(BFloat16)
     b: In(BFloat16)
     result: Out(BFloat16)

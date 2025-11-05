@@ -7,8 +7,6 @@ from parallel_prefix import KoggeStone
 
 
 class LeadingZeroAnticipator(wiring.Component):
-    """Leading Zero Anticipator with parallel prefix carry computation"""
-
     def __init__(self, width: int = 8):
         self.width = width
         self.count_bits = (width).bit_length()

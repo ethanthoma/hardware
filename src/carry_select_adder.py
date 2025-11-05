@@ -5,8 +5,6 @@ from amaranth.lib.wiring import In, Out
 
 
 class CarrySelectAdder(wiring.Component):
-    """Carry-Select Adder: O(sqrt(n)) delay vs O(n) ripple-carry"""
-
     def __init__(self, width: int = 27, block_size: int = 6):
         self.width = width
         self.block_size = block_size
@@ -62,8 +60,6 @@ class CarrySelectAdder(wiring.Component):
 
 
 class CarrySelectSubtractor(wiring.Component):
-    """Carry-Select Subtractor: a - b via two's complement"""
-
     def __init__(self, width: int = 27, block_size: int = 6):
         self.width = width
         self.block_size = block_size
