@@ -1,0 +1,178 @@
+from amaranth import *
+from amaranth.build import Platform
+from amaranth.lib import enum, wiring
+from amaranth.lib.wiring import In, Out
+
+from bfloat16 import BFloat16
+from pe import PE
+
+
+class State(enum.Enum, shape=4):
+    IDLE = 0
+    LOAD_C = 1
+    MAC_K0 = 2
+    MAC_K1 = 3
+    MAC_K2 = 4
+    MAC_K3 = 5
+    MAC_K4 = 6
+    MAC_K5 = 7
+    MAC_K6 = 8
+    MAC_K7 = 9
+    DONE = 10
+
+
+class TensorCore8x8(wiring.Component):
+    def __init__(self):
+        super().__init__(
+            {
+                "a_matrix": In(BFloat16).array(64),
+                "b_matrix": In(BFloat16).array(64),
+                "c_matrix": In(BFloat16).array(64),
+                "start": In(1),
+                "done": Out(1),
+                "d_matrix": Out(BFloat16).array(64),
+            }
+        )
+
+    def elaborate(self, platform: Platform | None) -> Module:
+        m = Module()
+
+        pe = Array(Array(PE() for _ in range(8)) for _ in range(8))
+        for i in range(8):
+            for j in range(8):
+                m.submodules[f"pe_{i}_{j}"] = pe[i][j]
+
+        state = Signal(State)
+        k = Signal(range(8))
+
+        for i in range(8):
+            for j in range(8):
+                idx = i * 8 + j
+                m.d.comb += pe[i][j].c_in.eq(self.c_matrix[idx])
+
+        with m.Switch(k):
+            for k_val in range(8):
+                with m.Case(k_val):
+                    for i in range(8):
+                        for j in range(8):
+                            a_idx = i * 8 + k_val
+                            b_idx = k_val * 8 + j
+                            m.d.comb += pe[i][j].a_in.eq(self.a_matrix[a_idx])
+                            m.d.comb += pe[i][j].b_in.eq(self.b_matrix[b_idx])
+
+        with m.Switch(state):
+            with m.Case(State.IDLE):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(0)
+
+                with m.If(self.start):
+                    m.d.sync += state.eq(State.LOAD_C)
+                    m.d.sync += k.eq(0)
+
+            with m.Case(State.LOAD_C):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(1)
+                        m.d.comb += pe[i][j].enable.eq(0)
+
+                m.d.sync += state.eq(State.MAC_K0)
+
+            with m.Case(State.MAC_K0):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += k.eq(1)
+                m.d.sync += state.eq(State.MAC_K1)
+
+            with m.Case(State.MAC_K1):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += k.eq(2)
+                m.d.sync += state.eq(State.MAC_K2)
+
+            with m.Case(State.MAC_K2):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += k.eq(3)
+                m.d.sync += state.eq(State.MAC_K3)
+
+            with m.Case(State.MAC_K3):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += k.eq(4)
+                m.d.sync += state.eq(State.MAC_K4)
+
+            with m.Case(State.MAC_K4):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += k.eq(5)
+                m.d.sync += state.eq(State.MAC_K5)
+
+            with m.Case(State.MAC_K5):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += k.eq(6)
+                m.d.sync += state.eq(State.MAC_K6)
+
+            with m.Case(State.MAC_K6):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += k.eq(7)
+                m.d.sync += state.eq(State.MAC_K7)
+
+            with m.Case(State.MAC_K7):
+                m.d.comb += self.done.eq(0)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(1)
+
+                m.d.sync += state.eq(State.DONE)
+
+            with m.Case(State.DONE):
+                m.d.comb += self.done.eq(1)
+                for i in range(8):
+                    for j in range(8):
+                        m.d.comb += pe[i][j].load_c.eq(0)
+                        m.d.comb += pe[i][j].enable.eq(0)
+
+                with m.If(~self.start):
+                    m.d.sync += state.eq(State.IDLE)
+
+        for i in range(8):
+            for j in range(8):
+                idx = i * 8 + j
+                m.d.comb += self.d_matrix[idx].eq(pe[i][j].acc_out)
+
+        return m

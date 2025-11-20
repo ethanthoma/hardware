@@ -170,15 +170,18 @@ class BF16_FMA(wiring.Component):
                 m.d.comb += rounded_mant.eq(rounder.mantissa_out)
                 m.d.comb += round_overflow.eq(rounder.overflow)
 
-                larger_exp = Signal(8)
+                base_larger_exp = Signal(8)
                 with m.If(product_larger):
-                    m.d.comb += larger_exp.eq(self.a.exponent + self.b.exponent - 127)
+                    m.d.comb += base_larger_exp.eq(self.a.exponent + self.b.exponent - 127)
                 with m.Else():
-                    m.d.comb += larger_exp.eq(self.c.exponent)
+                    m.d.comb += base_larger_exp.eq(self.c.exponent)
 
                 product_overflow = product_mant[15]
+                larger_exp = Signal(8)
                 with m.If(product_larger & product_overflow):
-                    m.d.comb += larger_exp.eq(larger_exp + 1)
+                    m.d.comb += larger_exp.eq(base_larger_exp + 1)
+                with m.Else():
+                    m.d.comb += larger_exp.eq(base_larger_exp)
 
                 result_exp = Signal(8)
                 exp_total = Signal(signed(10))

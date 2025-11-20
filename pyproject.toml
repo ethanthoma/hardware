@@ -31,6 +31,11 @@ fixable = ["ALL"]
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
