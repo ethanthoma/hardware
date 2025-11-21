@@ -4,21 +4,14 @@ from amaranth.lib import enum, wiring
 from amaranth.lib.wiring import In, Out
 
 from bfloat16 import BFloat16
-from pe import PE
+from pe_mac import PE_MAC
 
 
-class State(enum.Enum, shape=4):
+class State(enum.Enum, shape=2):
     IDLE = 0
     LOAD_C = 1
-    MAC_K0 = 2
-    MAC_K1 = 3
-    MAC_K2 = 4
-    MAC_K3 = 5
-    MAC_K4 = 6
-    MAC_K5 = 7
-    MAC_K6 = 8
-    MAC_K7 = 9
-    DONE = 10
+    MAC = 2
+    DONE = 3
 
 
 class TensorCore8x8(wiring.Component):
@@ -37,7 +30,7 @@ class TensorCore8x8(wiring.Component):
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
 
-        pe = Array(Array(PE() for _ in range(8)) for _ in range(8))
+        pe = Array(Array(PE_MAC() for _ in range(8)) for _ in range(8))
         for i in range(8):
             for j in range(8):
                 m.submodules[f"pe_{i}_{j}"] = pe[i][j]
@@ -79,86 +72,19 @@ class TensorCore8x8(wiring.Component):
                         m.d.comb += pe[i][j].load_c.eq(1)
                         m.d.comb += pe[i][j].enable.eq(0)
 
-                m.d.sync += state.eq(State.MAC_K0)
+                m.d.sync += state.eq(State.MAC)
 
-            with m.Case(State.MAC_K0):
+            with m.Case(State.MAC):
                 m.d.comb += self.done.eq(0)
                 for i in range(8):
                     for j in range(8):
                         m.d.comb += pe[i][j].load_c.eq(0)
                         m.d.comb += pe[i][j].enable.eq(1)
 
-                m.d.sync += k.eq(1)
-                m.d.sync += state.eq(State.MAC_K1)
-
-            with m.Case(State.MAC_K1):
-                m.d.comb += self.done.eq(0)
-                for i in range(8):
-                    for j in range(8):
-                        m.d.comb += pe[i][j].load_c.eq(0)
-                        m.d.comb += pe[i][j].enable.eq(1)
-
-                m.d.sync += k.eq(2)
-                m.d.sync += state.eq(State.MAC_K2)
-
-            with m.Case(State.MAC_K2):
-                m.d.comb += self.done.eq(0)
-                for i in range(8):
-                    for j in range(8):
-                        m.d.comb += pe[i][j].load_c.eq(0)
-                        m.d.comb += pe[i][j].enable.eq(1)
-
-                m.d.sync += k.eq(3)
-                m.d.sync += state.eq(State.MAC_K3)
-
-            with m.Case(State.MAC_K3):
-                m.d.comb += self.done.eq(0)
-                for i in range(8):
-                    for j in range(8):
-                        m.d.comb += pe[i][j].load_c.eq(0)
-                        m.d.comb += pe[i][j].enable.eq(1)
-
-                m.d.sync += k.eq(4)
-                m.d.sync += state.eq(State.MAC_K4)
-
-            with m.Case(State.MAC_K4):
-                m.d.comb += self.done.eq(0)
-                for i in range(8):
-                    for j in range(8):
-                        m.d.comb += pe[i][j].load_c.eq(0)
-                        m.d.comb += pe[i][j].enable.eq(1)
-
-                m.d.sync += k.eq(5)
-                m.d.sync += state.eq(State.MAC_K5)
-
-            with m.Case(State.MAC_K5):
-                m.d.comb += self.done.eq(0)
-                for i in range(8):
-                    for j in range(8):
-                        m.d.comb += pe[i][j].load_c.eq(0)
-                        m.d.comb += pe[i][j].enable.eq(1)
-
-                m.d.sync += k.eq(6)
-                m.d.sync += state.eq(State.MAC_K6)
-
-            with m.Case(State.MAC_K6):
-                m.d.comb += self.done.eq(0)
-                for i in range(8):
-                    for j in range(8):
-                        m.d.comb += pe[i][j].load_c.eq(0)
-                        m.d.comb += pe[i][j].enable.eq(1)
-
-                m.d.sync += k.eq(7)
-                m.d.sync += state.eq(State.MAC_K7)
-
-            with m.Case(State.MAC_K7):
-                m.d.comb += self.done.eq(0)
-                for i in range(8):
-                    for j in range(8):
-                        m.d.comb += pe[i][j].load_c.eq(0)
-                        m.d.comb += pe[i][j].enable.eq(1)
-
-                m.d.sync += state.eq(State.DONE)
+                with m.If(k == 7):
+                    m.d.sync += state.eq(State.DONE)
+                with m.Else():
+                    m.d.sync += k.eq(k + 1)
 
             with m.Case(State.DONE):
                 m.d.comb += self.done.eq(1)
