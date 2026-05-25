@@ -105,10 +105,6 @@
 
             commands = [
               { package = pkgs.uv; }
-              {
-                name = "claude";
-                package = pkgs.claude-code;
-              }
               { package = pkgs.tokei; }
               { package = pkgs.yosys; }
             ];
