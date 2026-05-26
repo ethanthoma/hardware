@@ -8,11 +8,11 @@ jobs:
   report:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install yosys
         run: sudo apt-get update && sudo apt-get install -y yosys
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
       - name: Sync dependencies
         run: uv sync
       - name: Synthesize and report area + depth
