@@ -38,3 +38,13 @@ amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
 
 [tool.pyrefly]
 search_path = ["src"]
+project-includes = ["src", "test", "analysis"]
+
+# false positives from Amaranth `wiring.Component` metaprogramming pyrefly can't model
+[[tool.pyrefly.sub_config]]
+matches = "src/**"
+errors = { missing-attribute = false, not-callable = false, invalid-annotation = false, unsupported-operation = false, bad-argument-type = false }
+
+[[tool.pyrefly.sub_config]]
+matches = "test/**"
+errors = { missing-attribute = false, not-callable = false, invalid-annotation = false, unsupported-operation = false, bad-argument-type = false }
