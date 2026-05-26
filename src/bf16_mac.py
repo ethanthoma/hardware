@@ -13,6 +13,14 @@ from normalizer import Normalizer
 from rounder import Rounder
 
 
+def product_to_bf16_mantissa(product, overflow):
+    return Mux(overflow, product[8:15], product[7:14])
+
+
+def product_to_datapath(product, overflow):
+    return Mux(overflow, product << 10, product << 11)
+
+
 class BF16_MAC(wiring.Component):
     a: In(BFloat16)
     b: In(BFloat16)
@@ -44,11 +52,11 @@ class BF16_MAC(wiring.Component):
         m.submodules.cs_adder = cs_adder = CarrySelectAdder(width=26, block_size=6)
         m.submodules.cs_sub = cs_sub = CarrySelectSubtractor(width=26, block_size=6)
 
-        a_is_zero = self.a.exponent == 0
-        b_is_zero = self.b.exponent == 0
-        c_is_zero = c_exp == 0
+        product = mult.product
+        product_overflow = product[15]
+        product_sign = self.a.sign ^ self.b.sign
 
-        with m.If(a_is_zero | b_is_zero):
+        def passthrough_c():
             c_mant_bf16 = Signal(7)
             round_up = c_mant_26[17]
             with m.If(round_up):
@@ -66,93 +74,51 @@ class BF16_MAC(wiring.Component):
             m.d.comb += self.result.mantissa.eq(c_mant_bf16)
             m.d.comb += self.intermediate.eq(self.c_acc)
 
-        with m.Elif(c_is_zero):
-            product_mant = mult.product
-            product_overflow = product_mant[15]
-
-            result_mant = Signal(7)
-            with m.If(product_overflow):
-                m.d.comb += result_mant.eq(product_mant[8:15])
-            with m.Else():
-                m.d.comb += result_mant.eq(product_mant[7:14])
-
+        def product_only():
             base_exp = Signal(8)
             m.d.comb += base_exp.eq(self.a.exponent + self.b.exponent - 127)
 
             result_exp = Signal(8)
-            with m.If(product_overflow):
-                m.d.comb += result_exp.eq(base_exp + 1)
-            with m.Else():
-                m.d.comb += result_exp.eq(base_exp)
+            m.d.comb += result_exp.eq(Mux(product_overflow, base_exp + 1, base_exp))
 
-            product_sign = self.a.sign ^ self.b.sign
             m.d.comb += self.result.sign.eq(product_sign)
             m.d.comb += self.result.exponent.eq(result_exp)
-            m.d.comb += self.result.mantissa.eq(result_mant)
+            m.d.comb += self.result.mantissa.eq(product_to_bf16_mantissa(product, product_overflow))
 
             product_mant_26 = Signal(26)
-            with m.If(product_overflow):
-                m.d.comb += product_mant_26.eq(product_mant << 10)
-            with m.Else():
-                m.d.comb += product_mant_26.eq(product_mant << 11)
+            m.d.comb += product_mant_26.eq(product_to_datapath(product, product_overflow))
             m.d.comb += self.intermediate.eq(Cat(product_mant_26, result_exp, product_sign))
 
-        with m.Else():
-            product_mant = mult.product
-            exp_difference = exp_diff.exp_diff.as_signed()
-
-            product_overflow = product_mant[15]
-
+        def fused_add():
             adjusted_exp_diff = Signal(signed(10))
-            with m.If(product_overflow):
-                m.d.comb += adjusted_exp_diff.eq(exp_difference + 1)
-            with m.Else():
-                m.d.comb += adjusted_exp_diff.eq(exp_difference)
+            m.d.comb += adjusted_exp_diff.eq(
+                Mux(product_overflow, exp_diff.exp_diff.as_signed() + 1, exp_diff.exp_diff.as_signed())
+            )
 
             product_larger = Signal()
             m.d.comb += product_larger.eq(adjusted_exp_diff >= 0)
 
-            adjusted_shift_amt = Signal(5)
             abs_adjusted_diff = Signal(10)
-            with m.If(adjusted_exp_diff < 0):
-                m.d.comb += abs_adjusted_diff.eq(-adjusted_exp_diff)
-            with m.Else():
-                m.d.comb += abs_adjusted_diff.eq(adjusted_exp_diff)
+            m.d.comb += abs_adjusted_diff.eq(Mux(adjusted_exp_diff < 0, -adjusted_exp_diff, adjusted_exp_diff))
 
-            with m.If(abs_adjusted_diff > 25):
-                m.d.comb += adjusted_shift_amt.eq(25)
-            with m.Else():
-                m.d.comb += adjusted_shift_amt.eq(abs_adjusted_diff[0:5])
+            adjusted_shift_amt = Signal(5)
+            m.d.comb += adjusted_shift_amt.eq(Mux(abs_adjusted_diff > 25, 25, abs_adjusted_diff[0:5]))
 
+            product_positioned = product_to_datapath(product, product_overflow)
             product_extended = Signal(26)
             c_extended = Signal(26)
-
             with m.If(product_larger):
-                with m.If(product_overflow):
-                    m.d.comb += product_extended.eq(product_mant << 10)
-                with m.Else():
-                    m.d.comb += product_extended.eq(product_mant << 11)
-
+                m.d.comb += product_extended.eq(product_positioned)
                 m.d.comb += aligner.value_in.eq(c_mant_26)
                 m.d.comb += aligner.shift_amount.eq(adjusted_shift_amt)
                 m.d.comb += c_extended.eq(aligner.value_out)
             with m.Else():
                 m.d.comb += c_extended.eq(c_mant_26)
-
-                product_positioned = Signal(26)
-                with m.If(product_overflow):
-                    m.d.comb += product_positioned.eq(product_mant << 10)
-                with m.Else():
-                    m.d.comb += product_positioned.eq(product_mant << 11)
-
                 m.d.comb += aligner.value_in.eq(product_positioned)
                 m.d.comb += aligner.shift_amount.eq(adjusted_shift_amt)
                 m.d.comb += product_extended.eq(aligner.value_out)
 
-            product_sign = self.a.sign ^ self.b.sign
             signs_match = product_sign == c_sign
-
-            sum_mant = Signal(27)
 
             product_mant_larger = Signal()
             m.d.comb += product_mant_larger.eq(product_extended >= c_extended)
@@ -160,6 +126,7 @@ class BF16_MAC(wiring.Component):
             larger_mant_ext = Mux(product_mant_larger, product_extended, c_extended)
             smaller_mant_ext = Mux(product_mant_larger, c_extended, product_extended)
 
+            sum_mant = Signal(27)
             with m.If(signs_match):
                 m.d.comb += cs_adder.a.eq(product_extended)
                 m.d.comb += cs_adder.b.eq(c_extended)
@@ -197,25 +164,10 @@ class BF16_MAC(wiring.Component):
                     m.d.comb += sum_mant_adjusted.eq(normalizer.value_out)
                     m.d.comb += exp_adjustment.eq(-lz_count)
 
-                result_mant_unrounded = Signal(7)
-                guard = Signal()
-                round_bit = Signal()
-                sticky = Signal()
-
-                m.d.comb += result_mant_unrounded.eq(sum_mant_adjusted[18:25])
-                m.d.comb += guard.eq(sum_mant_adjusted[17])
-                m.d.comb += round_bit.eq(sum_mant_adjusted[16])
-                m.d.comb += sticky.eq(sum_mant_adjusted[0:16].any())
-
-                m.d.comb += rounder.mantissa_in.eq(result_mant_unrounded)
-                m.d.comb += rounder.guard.eq(guard)
-                m.d.comb += rounder.round_bit.eq(round_bit)
-                m.d.comb += rounder.sticky.eq(sticky)
-
-                rounded_mant = Signal(7)
-                round_overflow = Signal()
-                m.d.comb += rounded_mant.eq(rounder.mantissa_out)
-                m.d.comb += round_overflow.eq(rounder.overflow)
+                m.d.comb += rounder.mantissa_in.eq(sum_mant_adjusted[18:25])
+                m.d.comb += rounder.guard.eq(sum_mant_adjusted[17])
+                m.d.comb += rounder.round_bit.eq(sum_mant_adjusted[16])
+                m.d.comb += rounder.sticky.eq(sum_mant_adjusted[0:16].any())
 
                 base_larger_exp = Signal(8)
                 with m.If(product_larger):
@@ -224,36 +176,25 @@ class BF16_MAC(wiring.Component):
                     m.d.comb += base_larger_exp.eq(c_exp)
 
                 larger_exp = Signal(8)
-                with m.If(product_larger & product_overflow):
-                    m.d.comb += larger_exp.eq(base_larger_exp + 1)
-                with m.Else():
-                    m.d.comb += larger_exp.eq(base_larger_exp)
+                m.d.comb += larger_exp.eq(Mux(product_larger & product_overflow, base_larger_exp + 1, base_larger_exp))
 
-                result_exp = Signal(8)
                 exp_total = Signal(signed(10))
-                m.d.comb += exp_total.eq(larger_exp + exp_adjustment + round_overflow)
-                m.d.comb += result_exp.eq(exp_total[0:8])
+                m.d.comb += exp_total.eq(larger_exp + exp_adjustment + rounder.overflow)
+                m.d.comb += self.result.mantissa.eq(rounder.mantissa_out)
+                m.d.comb += self.result.exponent.eq(exp_total[0:8])
 
-                result_sign = Signal()
-                with m.If(signs_match):
-                    with m.If(product_larger):
-                        m.d.comb += result_sign.eq(product_sign)
-                    with m.Else():
-                        m.d.comb += result_sign.eq(c_sign)
-                with m.Else():
-                    with m.If(product_mant_larger):
-                        m.d.comb += result_sign.eq(product_sign)
-                    with m.Else():
-                        m.d.comb += result_sign.eq(c_sign)
-
-                m.d.comb += self.result.mantissa.eq(rounded_mant)
-                m.d.comb += self.result.exponent.eq(result_exp)
+                result_sign = Mux(signs_match | product_mant_larger, product_sign, c_sign)
                 m.d.comb += self.result.sign.eq(result_sign)
 
-                intermediate_exp = Signal(8)
-                intermediate_exp_calc = Signal(signed(10))
-                m.d.comb += intermediate_exp_calc.eq(larger_exp + exp_adjustment)
-                m.d.comb += intermediate_exp.eq(intermediate_exp_calc[0:8])
-                m.d.comb += self.intermediate.eq(Cat(sum_mant_adjusted, intermediate_exp, result_sign))
+                intermediate_exp = Signal(signed(10))
+                m.d.comb += intermediate_exp.eq(larger_exp + exp_adjustment)
+                m.d.comb += self.intermediate.eq(Cat(sum_mant_adjusted, intermediate_exp[0:8], result_sign))
+
+        with m.If((self.a.exponent == 0) | (self.b.exponent == 0)):
+            passthrough_c()
+        with m.Elif(c_exp == 0):
+            product_only()
+        with m.Else():
+            fused_add()
 
         return m
