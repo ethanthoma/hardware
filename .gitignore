@@ -10,6 +10,10 @@
 !flake.lock
 !flake.nix
 
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
+
 !src/
 !src/**/*.py
 
