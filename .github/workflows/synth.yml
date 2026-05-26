@@ -1,0 +1,26 @@
+name: synth
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yosys
+        run: sudo apt-get update && sudo apt-get install -y yosys
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        run: uv sync
+      - name: Synthesize and report area + depth
+        run: |
+          {
+            echo '## Synthesis report'
+            echo '`cells` = gate count (area), `depth` = 6-LUT levels (delay proxy)'
+            echo '```'
+            uv run python analysis/synth.py
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
