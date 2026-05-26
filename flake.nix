@@ -5,24 +5,6 @@
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     devshell.url = "github:numtide/devshell";
-
-    pyproject-nix = {
-      url = "github:nix-community/pyproject.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    uv2nix = {
-      url = "github:adisbladis/uv2nix";
-      inputs.pyproject-nix.follows = "pyproject-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    pyproject-build-systems = {
-      url = "github:pyproject-nix/build-system-pkgs";
-      inputs.pyproject-nix.follows = "pyproject-nix";
-      inputs.uv2nix.follows = "uv2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -31,24 +13,11 @@
     inputs.flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [ inputs.devshell.flakeModule ];
 
-      systems = [
-        "aarch64-darwin"
-        "aarch64-linux"
-        "i686-linux"
-        "x86_64-darwin"
-        "x86_64-linux"
-      ];
+      systems = [ "x86_64-linux" ];
 
       perSystem =
-        { system, ... }:
+        { pkgs, ... }:
         let
-          pkgs = import inputs.nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-            config.cudaSupport = true;
-            config.cudaVersion = "12";
-            overlays = [ inputs.devshell.overlays.default ];
-          };
 
           python =
             let
@@ -61,12 +30,10 @@
             pkgs.${packageName} or pkgs.python314;
         in
         {
-          _module.args.pkgs = pkgs;
-
           devshells.default = {
             packages = [
               pkgs.ruff
-              #pkgs.ty
+              pkgs.yamlfmt
               pkgs.pyrefly
             ];
 
@@ -91,16 +58,6 @@
                 name = "PATH";
                 eval = "/home/ethanthoma/.local/bin:$PATH";
               }
-
-              {
-                name = "LD_LIBRARY_PATH";
-                eval = "$LD_LIBRARY_PATH:${
-                  inputs.nixpkgs.lib.makeLibraryPath ([
-                    pkgs.stdenv.cc.cc.lib
-                    pkgs.libz
-                  ])
-                }";
-              }
             ];
 
             commands = [
@@ -113,9 +70,7 @@
     };
 
   nixConfig = {
-    extra-substituters = [
-      "https://nix-community.cachix.org"
-    ];
+    extra-substituters = [ "https://nix-community.cachix.org" ];
     extra-trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
     ];
