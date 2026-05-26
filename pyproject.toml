@@ -1,25 +1,17 @@
 [project]
 name = "hardware"
 version = "0.1.0"
-description = "Add your description here"
+description = "A bfloat16 tensor core in Amaranth HDL: an 8x8 systolic MAC array computing D = A·B + C with extended-precision accumulation."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "amaranth[builtin-yosys]>=0.5.8",
-    "numpy>=2.3.4",
-]
+dependencies = ["amaranth[builtin-yosys]>=0.5.8", "numpy>=2.3.4"]
 
 [dependency-groups]
-dev = [
-    "pytest>=8.4.2",
-]
+dev = ["pytest>=8.4.2"]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
-
-[project.scripts]
-main = "main:main"
 
 [tool.ruff]
 line-length = 120
@@ -32,9 +24,7 @@ fixable = ["ALL"]
 "__init__.py" = ["E402"]
 
 [tool.pytest.ini_options]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-]
+markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
 
 [tool.pyright]
 venvPath = "."
@@ -47,4 +37,4 @@ python = "./.venv/bin/python"
 amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
 
 [tool.pyrefly]
-search_path = [ "src" ]
+search_path = ["src"]
