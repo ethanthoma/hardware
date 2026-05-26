@@ -1,5 +1,6 @@
 import re
 import subprocess
+import sys
 from typing import Callable, NamedTuple
 
 from amaranth.back import rtlil
@@ -28,6 +29,7 @@ class Block(NamedTuple):
     name: str
     build: Callable[[], wiring.Component]
     combinational: bool
+    slow: bool = False
 
 
 BLOCKS = [
@@ -42,7 +44,7 @@ BLOCKS = [
     Block("FusedExponentDifference", FusedExponentDifference, True),
     Block("BF16_MAC", BF16_MAC, True),
     Block("PE_MAC", PE_MAC, False),
-    Block("TensorCore8x8", TensorCore8x8, False),
+    Block("TensorCore8x8", TensorCore8x8, False, slow=True),
 ]
 
 
@@ -66,12 +68,15 @@ def lut_depth(yosys_output: str) -> int | None:
 
 
 def main() -> None:
-    print(f"{'block':<26}{'cells':>8}{'depth (LUT6)':>14}")
-    print("-" * 48)
+    include_slow = "--all" in sys.argv
+    print(f"{'block':<26}{'cells':>8}{'depth (LUT6)':>14}", flush=True)
+    print("-" * 48, flush=True)
     for block in BLOCKS:
+        if block.slow and not include_slow:
+            continue
         output = synthesize(block)
         depth = lut_depth(output)
-        print(f"{block.name:<26}{cell_count(output):>8}{(str(depth) if depth is not None else '—'):>14}")
+        print(f"{block.name:<26}{cell_count(output):>8}{(str(depth) if depth is not None else '—'):>14}", flush=True)
 
 
 if __name__ == "__main__":

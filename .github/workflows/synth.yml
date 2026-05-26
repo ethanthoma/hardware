@@ -4,6 +4,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Include slow blocks (TensorCore8x8, ~7min)"
+        type: boolean
+        default: false
 jobs:
   report:
     runs-on: ubuntu-latest
@@ -21,6 +27,6 @@ jobs:
             echo '## Synthesis report'
             echo '`cells` = gate count (area), `depth` = 6-LUT levels (delay proxy)'
             echo '```'
-            uv run python analysis/synth.py
-            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          uv run python analysis/synth.py ${{ inputs.full && '--all' || '' }} | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
