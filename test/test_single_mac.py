@@ -1,4 +1,5 @@
 """Test a single MAC operation to isolate the issue"""
+
 import numpy as np
 from amaranth.hdl import Period
 from amaranth.sim import Simulator
@@ -19,9 +20,9 @@ def test_single_mac_k3():
         C_vals = [0.0] * 16
 
         # Set A[0,3] = 10.0
-        A_vals[0*4 + 3] = 10.0
+        A_vals[0 * 4 + 3] = 10.0
         # Set B[3,0] = 20.0
-        B_vals[3*4 + 0] = 20.0
+        B_vals[3 * 4 + 0] = 20.0
         # Set C to 100.0 so we can see the accumulation
         C_vals[0] = 100.0
 

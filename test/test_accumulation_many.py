@@ -1,5 +1,7 @@
 """Show where FP32 accumulation significantly helps"""
+
 import numpy as np
+
 from bfloat16 import BF16
 
 

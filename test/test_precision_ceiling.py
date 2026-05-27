@@ -1,5 +1,7 @@
 """Show the precision ceiling with BF16 accumulator vs ideal FP32"""
+
 import numpy as np
+
 from bfloat16 import BF16
 
 
@@ -15,10 +17,7 @@ def test_precision_ceiling():
     for i in range(8):
         for j in range(8):
             # Ground truth (FP64)
-            truth = sum(
-                BF16.from_float(A[i, k]).to_float() * BF16.from_float(B[k, j]).to_float()
-                for k in range(8)
-            )
+            truth = sum(BF16.from_float(A[i, k]).to_float() * BF16.from_float(B[k, j]).to_float() for k in range(8))
 
             # Current approach: BF16 accumulator (what hardware does)
             acc_bf16 = 0.0
@@ -70,14 +69,16 @@ def test_precision_ceiling():
         bf16_pct = counts_bf16[i] / 64 * 100
         fp32_pct = counts_fp32[i] / 64 * 100
         improvement = fp32_pct - bf16_pct
-        print(f"< {thresh*100:>4.0f}% error  {counts_bf16[i]:>2d}/64 ({bf16_pct:>5.1f}%)   "
-              f"{counts_fp32[i]:>2d}/64 ({fp32_pct:>5.1f}%)   +{improvement:>5.1f}%")
+        print(
+            f"< {thresh * 100:>4.0f}% error  {counts_bf16[i]:>2d}/64 ({bf16_pct:>5.1f}%)   "
+            f"{counts_fp32[i]:>2d}/64 ({fp32_pct:>5.1f}%)   +{improvement:>5.1f}%"
+        )
 
     print("\n" + "=" * 70)
-    print(f"Max error (BF16): {max(errors_bf16)*100:.2f}%")
-    print(f"Max error (FP32): {max(errors_fp32)*100:.2f}%")
-    print(f"Mean error (BF16): {np.mean(errors_bf16)*100:.2f}%")
-    print(f"Mean error (FP32): {np.mean(errors_fp32)*100:.2f}%")
+    print(f"Max error (BF16): {max(errors_bf16) * 100:.2f}%")
+    print(f"Max error (FP32): {max(errors_fp32) * 100:.2f}%")
+    print(f"Mean error (BF16): {np.mean(errors_bf16) * 100:.2f}%")
+    print(f"Mean error (FP32): {np.mean(errors_fp32) * 100:.2f}%")
 
     print("\n" + "=" * 70)
     print("CONCLUSION:")
