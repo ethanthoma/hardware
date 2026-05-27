@@ -1,5 +1,7 @@
 """Compare BF16 vs FP32 accumulation precision"""
+
 import numpy as np
+
 from bfloat16 import BF16
 
 
@@ -38,7 +40,7 @@ def test_accumulation_precision():
 
     final_bf16_from_fp32 = BF16.from_float(float(acc_fp32)).to_float()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Ground truth (FP64):        {truth:.6f}")
     print(f"BF16 accumulation:          {acc_bf16:.6f}  (error: {abs(acc_bf16 - truth):.6f})")
     print(f"FP32 accumulation:          {acc_fp32:.6f}  (error: {abs(acc_fp32 - truth):.6f})")
