@@ -6,7 +6,7 @@ from amaranth.lib.wiring import In, Out
 from bfloat16 import BFloat16
 from pe_mac import PE_MAC
 
-N = 4  # 4x4x4 MMA: A, B, C, D are N×N and the contraction dimension K is N
+N = 4  # physical PE array is N×N; one mma sweeps it over the 16×16 logical tile
 
 
 class State(enum.Enum, shape=2):
@@ -16,7 +16,7 @@ class State(enum.Enum, shape=2):
     DONE = 3
 
 
-class MMA4x4(wiring.Component):
+class MMA(wiring.Component):
     def __init__(self):
         super().__init__(
             {

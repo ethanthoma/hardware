@@ -5,7 +5,7 @@ from amaranth.hdl import Period
 from amaranth.sim import Simulator
 
 from bfloat16 import BF16
-from mma_4x4 import MMA4x4
+from mma import MMA
 
 N = 4
 
@@ -37,7 +37,7 @@ def bf16_matmul(A, B, C):
 
 
 def run_mma(request, A, B, C):
-    dut = MMA4x4()
+    dut = MMA()
     out = {}
 
     async def bench(ctx):
@@ -66,7 +66,7 @@ def run_mma(request, A, B, C):
     sim.add_clock(Period(us=1))
     sim.add_testbench(bench)
     if request.config.getoption("--vcd"):
-        with sim.write_vcd(f"MMA4x4_{request.node.name}.vcd"):
+        with sim.write_vcd(f"MMA_{request.node.name}.vcd"):
             sim.run()
     else:
         sim.run()
