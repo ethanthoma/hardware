@@ -5,12 +5,12 @@ from amaranth.hdl import Period
 from amaranth.sim import Simulator
 
 from bfloat16 import BF16
-from mma_4x4 import MMA4x4
+from mma import MMA
 
 
 def test_single_mac_k3():
     """Test just the k=3 MAC to see if data routing works"""
-    dut = MMA4x4()
+    dut = MMA()
 
     async def bench(ctx):
         # Set up matrices where we can easily verify k=3 operation
