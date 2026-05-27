@@ -12,11 +12,11 @@ from carry_select_adder import CarrySelectAdder, CarrySelectSubtractor
 from fused_exp_diff import FusedExponentDifference
 from lza import LeadingZeroAnticipator
 from mantissa_multiplier import MantissaMultiplier
+from mma_4x4 import MMA4x4
 from normalizer import Normalizer
 from parallel_prefix import KoggeStone
 from pe_mac import PE_MAC
 from rounder import Rounder
-from tensor_core_8x8 import TensorCore8x8
 
 
 def run_yosys(script: str) -> str:
@@ -44,7 +44,7 @@ BLOCKS = [
     Block("FusedExponentDifference", FusedExponentDifference, True),
     Block("BF16_MAC", BF16_MAC, True),
     Block("PE_MAC", PE_MAC, False),
-    Block("TensorCore8x8", TensorCore8x8, False, slow=True),
+    Block("MMA4x4", MMA4x4, False),
 ]
 
 
