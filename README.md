@@ -3,9 +3,9 @@
 A bfloat16 matrix multiply-accumulate (MMA) unit written in
 [Amaranth HDL](https://github.com/amaranth-lang/amaranth).
 
-It builds bottom-up from arithmetic primitives to a 4×4×4 MAC array
-(`MMA4x4`) that computes `D = A·B + C` over bf16 matrices, accumulating
-in extended (26-bit mantissa) precision and rounding to bf16 only at the output.
+It builds bottom-up from arithmetic primitives to a 4×4×4 MAC array (`MMA4x4`)
+that computes `D = A·B + C` over bf16 matrices, accumulating in extended (26-bit
+mantissa) precision and rounding to bf16 only at the output.
 
 ## Setup
 
