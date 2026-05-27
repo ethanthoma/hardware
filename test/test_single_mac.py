@@ -4,24 +4,24 @@ from amaranth.hdl import Period
 from amaranth.sim import Simulator
 
 from bfloat16 import BF16
-from tensor_core_8x8 import TensorCore8x8
+from mma_4x4 import MMA4x4
 
 
 def test_single_mac_k3():
     """Test just the k=3 MAC to see if data routing works"""
-    dut = TensorCore8x8()
+    dut = MMA4x4()
 
     async def bench(ctx):
         # Set up matrices where we can easily verify k=3 operation
         # D[0,0] with k=3 should use A[0,3] and B[3,0]
-        A_vals = [0.0] * 64
-        B_vals = [0.0] * 64
-        C_vals = [0.0] * 64
+        A_vals = [0.0] * 16
+        B_vals = [0.0] * 16
+        C_vals = [0.0] * 16
 
         # Set A[0,3] = 10.0
-        A_vals[0*8 + 3] = 10.0
+        A_vals[0*4 + 3] = 10.0
         # Set B[3,0] = 20.0
-        B_vals[3*8 + 0] = 20.0
+        B_vals[3*4 + 0] = 20.0
         # Set C to 100.0 so we can see the accumulation
         C_vals[0] = 100.0
 
