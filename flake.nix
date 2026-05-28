@@ -68,6 +68,8 @@
               { package = pkgs.uv; }
               { package = pkgs.tokei; }
               { package = pkgs.yosys; }
+              { package = pkgs.nextpnr; }
+              { package = pkgs.trellis; }
             ];
           };
         };
