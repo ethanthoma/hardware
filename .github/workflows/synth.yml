@@ -10,8 +10,6 @@ on:
         description: "Include slow blocks (TensorCore8x8, ~7min)"
         type: boolean
         default: false
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 jobs:
   report:
     runs-on: ubuntu-latest
@@ -21,11 +19,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y yosys
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
-      - name: Cache .venv
-        uses: actions/cache@v4
         with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - name: Sync dependencies
         run: uv sync
       - name: Synthesize and report area + depth
