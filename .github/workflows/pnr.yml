@@ -24,7 +24,7 @@ jobs:
       - name: P&R and report Fmax + utilization
         run: |
           {
-            echo '## P&R report (ECP5 LFE5U-25F, speed 6)'
+            echo '## P&R report (ECP5 LFE5UM5G-85F, speed 8 -- eval-board part)'
             echo '`fmax` = post-route worst-case clock, `TRELLIS_COMB/FF` = LUTs/flops, `MULT18X18D` = DSP blocks'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

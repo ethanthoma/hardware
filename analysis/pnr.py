@@ -13,9 +13,9 @@ from amaranth.lib.wiring import In, Out
 from fixed_pe import FixedPE
 from mma import MMA
 
-DEVICE = "25k"
-PACKAGE = "CABGA381"
-SPEED = "6"
+DEVICE = "um5g-85k"
+PACKAGE = "CABGA756"
+SPEED = "8"
 TARGET_MHZ = 100
 
 
