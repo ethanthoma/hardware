@@ -9,6 +9,7 @@ from amaranth.lib import wiring
 from aligner import Aligner
 from bf16_mac import BF16_MAC
 from carry_select_adder import CarrySelectAdder, CarrySelectSubtractor
+from fixed_pe import FixedMAC, FixedPE
 from fused_exp_diff import FusedExponentDifference
 from lza import LeadingZeroAnticipator
 from mantissa_multiplier import MantissaMultiplier
@@ -45,6 +46,8 @@ BLOCKS = [
     Block("BF16_MAC", BF16_MAC, True),
     Block("PE_MAC", PE_MAC, False),
     Block("MMA", MMA, False),
+    Block("FixedMAC", FixedMAC, True),
+    Block("FixedPE", FixedPE, False),
 ]
 
 
