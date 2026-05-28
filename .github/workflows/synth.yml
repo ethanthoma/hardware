@@ -19,6 +19,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y yosys
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
+      - name: Cache .venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}
       - name: Sync dependencies
         run: uv sync
       - name: Synthesize and report area + depth

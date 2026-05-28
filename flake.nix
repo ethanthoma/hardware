@@ -35,6 +35,10 @@
               pkgs.ruff
               pkgs.yamlfmt
               pkgs.pyrefly
+              pkgs.gfortran
+              pkgs.openblas
+              pkgs.pkg-config
+              pkgs.ninja
             ];
 
             env = [

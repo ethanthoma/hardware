@@ -33,6 +33,9 @@ venv = ".venv"
 [tool.ty.environment]
 python = "./.venv/bin/python"
 
+[tool.uv]
+no-binary-package = ["numpy"]
+
 [tool.uv.sources]
 amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
 
