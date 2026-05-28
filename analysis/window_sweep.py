@@ -1,4 +1,5 @@
 import math
+import sys
 from typing import Callable, NamedTuple
 
 import numpy as np
@@ -85,12 +86,17 @@ def verdict(s: dict[str, float]) -> str:
     return "MARGINAL"
 
 
+ACCEPTABLE_VERDICT = "OK for fixed-point"
+
+
 def main() -> None:
     header = f"{'workload':<32}{'in':>8}{'< 2^-18':>10}{'> 2^13':>9}{'row OF':>9}{'p99 mag':>12}  verdict"
     print(header, flush=True)
     print("-" * (len(header) + 32), flush=True)
+    regressions = []
     for w in WORKLOADS:
         s = sweep(w, n=200_000, seed=0xA11)
+        v = verdict(s)
         print(
             f"{w.name:<32}"
             f"{s['in_window_pct']:>7.2f}%"
@@ -98,9 +104,15 @@ def main() -> None:
             f"{s['above_window_pct']:>8.3f}%"
             f"{s['row_overflow_pct']:>8.3f}%"
             f"{s['p99_mag']:>12.3g}  "
-            f"{verdict(s)}",
+            f"{v}",
             flush=True,
         )
+        if v != ACCEPTABLE_VERDICT:
+            regressions.append(f"{w.name}: {v}")
+
+    if regressions:
+        print("\nFAIL: workload(s) outside the window:", *regressions, sep="\n  ", flush=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

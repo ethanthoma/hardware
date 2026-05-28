@@ -18,3 +18,5 @@ jobs:
         run: uv sync
       - name: Run tests
         run: uv run pytest test/ -v -m "not slow"
+      - name: Window-acceptability sweep
+        run: uv run python analysis/window_sweep.py

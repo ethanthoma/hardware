@@ -1,6 +1,7 @@
 import json
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Callable, NamedTuple
@@ -149,11 +150,14 @@ def parse_critical_path(log: str) -> tuple[float, list[tuple[str, int]]]:
 
 INTERESTING_CELLS = ("TRELLIS_COMB", "TRELLIS_FF", "MULT18X18D", "DP16KD")
 
+FMAX_FLOORS_MHZ = {"MMA": 50.0, "FixedPE": 55.0}
+
 
 def main() -> None:
     print(f"{'block':<12}{'fmax MHz':>10}" + "".join(f"{c:>14}" for c in INTERESTING_CELLS), flush=True)
     print("-" * (22 + 14 * len(INTERESTING_CELLS)), flush=True)
     critical_paths: list[tuple[str, float, list[tuple[str, int]]]] = []
+    measured: dict[str, float | None] = {}
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp = Path(tmp_str)
         for block in BLOCKS:
@@ -163,6 +167,7 @@ def main() -> None:
             log = pnr(json_in, report)
             util = parse_utilization(report)
             fmax = parse_fmax(log)
+            measured[block.name] = fmax
             path_ns, files = parse_critical_path(log)
             cells = "".join(f"{util.get(c, 0):>14}" for c in INTERESTING_CELLS)
             print(f"{block.name:<12}{(f'{fmax:.1f}' if fmax else '-'):>10}{cells}", flush=True)
@@ -172,6 +177,15 @@ def main() -> None:
     for name, path_ns, files in critical_paths:
         top = ", ".join(f"{f} (x{n})" for f, n in files[:4]) or "(no project files found in path)"
         print(f"  {name:<10} {path_ns:>6.2f} ns  {top}", flush=True)
+
+    regressions = [
+        f"{name}: {measured.get(name)} MHz < floor {floor} MHz"
+        for name, floor in FMAX_FLOORS_MHZ.items()
+        if measured.get(name) is None or measured[name] < floor
+    ]
+    if regressions:
+        print("\nFAIL: Fmax regression vs floor:", *regressions, sep="\n  ", flush=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
