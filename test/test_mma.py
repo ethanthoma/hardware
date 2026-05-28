@@ -113,3 +113,17 @@ def test_powers_of_two(request):
     A = np.array([[2.0 ** ((i - j) % 4 - 2) for j in range(N)] for i in range(N)], dtype=np.float32)
     B = np.array([[2.0 ** ((j - i) % 4 - 2) for j in range(N)] for i in range(N)], dtype=np.float32)
     assert_bit_exact(run_mma(request, A, B), bf16_matmul(A, B))
+
+
+def test_window_edge_stress(request):
+    """Randomized matmuls with product magnitudes packed near FixedPE's window edges."""
+    rng = np.random.default_rng(0xED6E)
+    near_top_exp, near_bottom_exp = 4, -9
+    for trial in range(8):
+        scale_exp = near_top_exp if trial % 2 == 0 else near_bottom_exp
+        scale = 2.0**scale_exp
+        signs_a = rng.choice([-1.0, 1.0], size=(N, N))
+        signs_b = rng.choice([-1.0, 1.0], size=(N, N))
+        A = (signs_a * (1.0 + rng.random((N, N))) * scale).astype(np.float32)
+        B = (signs_b * (1.0 + rng.random((N, N))) * scale).astype(np.float32)
+        assert_bit_exact(run_mma(request, A, B), bf16_matmul(A, B))
