@@ -8,7 +8,7 @@ from pe_mac import PE_MAC
 def run(steps):
     """Each step is a dict of controls/operands; returns (acc_wide, acc_out float) after each tick.
 
-    keys: load_c / load_acc / enable (0/1), a / b / c (floats → bf16), acc_in (35-bit int).
+    keys: load_c / load_acc / enable (0/1), a / b / c (floats -> bf16), acc_in (35-bit int).
     """
     dut = PE_MAC()
     snaps = []

@@ -44,7 +44,7 @@ def test_accumulation_precision():
     print(f"Ground truth (FP64):        {truth:.6f}")
     print(f"BF16 accumulation:          {acc_bf16:.6f}  (error: {abs(acc_bf16 - truth):.6f})")
     print(f"FP32 accumulation:          {acc_fp32:.6f}  (error: {abs(acc_fp32 - truth):.6f})")
-    print(f"FP32 → BF16:                {final_bf16_from_fp32:.6f}  (error: {abs(final_bf16_from_fp32 - truth):.6f})")
+    print(f"FP32 -> BF16:               {final_bf16_from_fp32:.6f}  (error: {abs(final_bf16_from_fp32 - truth):.6f})")
     print(f"\nBF16 error: {abs(acc_bf16 - truth) / abs(truth) * 100:.1f}%")
     print(f"FP32 error: {abs(final_bf16_from_fp32 - truth) / abs(truth) * 100:.1f}%")
     print(f"Improvement: {abs(acc_bf16 - truth) / abs(final_bf16_from_fp32 - truth):.1f}x better")

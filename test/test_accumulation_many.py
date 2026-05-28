@@ -26,10 +26,10 @@ def test_many_small_values():
         acc_fp32 = acc_fp32 + np.float32(val_bf16)
     final_bf16_from_fp32 = BF16.from_float(float(acc_fp32)).to_float()
 
-    print("Test: Accumulating 8 × 0.0625 = 0.5")
+    print("Test: Accumulating 8 * 0.0625 = 0.5")
     print(f"Ground truth:        {truth:.6f}")
     print(f"BF16 accumulation:   {acc_bf16:.6f}  (error: {abs(acc_bf16 - truth):.6f})")
-    print(f"FP32 → BF16:         {final_bf16_from_fp32:.6f}  (error: {abs(final_bf16_from_fp32 - truth):.6f})")
+    print(f"FP32 -> BF16:        {final_bf16_from_fp32:.6f}  (error: {abs(final_bf16_from_fp32 - truth):.6f})")
 
 
 def test_cancellation():
@@ -62,7 +62,7 @@ def test_cancellation():
     print("\nTest: Catastrophic cancellation (1000*0.001 - 1000*0.001 + 0.1*0.1)")
     print(f"Ground truth:        {truth:.6f}")
     print(f"BF16 accumulation:   {acc_bf16:.6f}  (error: {abs(acc_bf16 - truth):.6f})")
-    print(f"FP32 → BF16:         {final_bf16_from_fp32:.6f}  (error: {abs(final_bf16_from_fp32 - truth):.6f})")
+    print(f"FP32 -> BF16:        {final_bf16_from_fp32:.6f}  (error: {abs(final_bf16_from_fp32 - truth):.6f})")
     print(f"Improvement: {abs(acc_bf16 - truth) / max(abs(final_bf16_from_fp32 - truth), 1e-8):.1f}x")
 
 

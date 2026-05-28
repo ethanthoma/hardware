@@ -83,11 +83,11 @@ def test_precision_ceiling():
     print("\n" + "=" * 70)
     print("CONCLUSION:")
     if max(errors_bf16) < 0.05:
-        print("✅ Current BF16 accumulator: < 5% error on all elements")
+        print("PASS Current BF16 accumulator: < 5% error on all elements")
     elif max(errors_bf16) < 0.10:
-        print("⚠️  Current BF16 accumulator: < 10% error on all elements")
+        print("WARN Current BF16 accumulator: < 10% error on all elements")
     else:
-        print("❌ Current BF16 accumulator: some elements > 10% error")
+        print("FAIL Current BF16 accumulator: some elements > 10% error")
 
     print(f"\nFP32 accumulator would improve {counts_fp32[2] - counts_bf16[2]} more elements to < 5%")
 
