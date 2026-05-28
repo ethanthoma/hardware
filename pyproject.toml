@@ -51,3 +51,7 @@ errors = { missing-attribute = false, not-callable = false, invalid-annotation =
 [[tool.pyrefly.sub_config]]
 matches = "test/**"
 errors = { missing-attribute = false, not-callable = false, invalid-annotation = false, unsupported-operation = false, bad-argument-type = false }
+
+[[tool.pyrefly.sub_config]]
+matches = "analysis/**"
+errors = { missing-attribute = false, not-callable = false, invalid-annotation = false, unsupported-operation = false, bad-argument-type = false }

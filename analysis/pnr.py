@@ -178,11 +178,11 @@ def main() -> None:
         top = ", ".join(f"{f} (x{n})" for f, n in files[:4]) or "(no project files found in path)"
         print(f"  {name:<10} {path_ns:>6.2f} ns  {top}", flush=True)
 
-    regressions = [
-        f"{name}: {measured.get(name)} MHz < floor {floor} MHz"
-        for name, floor in FMAX_FLOORS_MHZ.items()
-        if measured.get(name) is None or measured[name] < floor
-    ]
+    regressions = []
+    for name, floor in FMAX_FLOORS_MHZ.items():
+        fmax = measured.get(name)
+        if fmax is None or fmax < floor:
+            regressions.append(f"{name}: {fmax} MHz < floor {floor} MHz")
     if regressions:
         print("\nFAIL: Fmax regression vs floor:", *regressions, sep="\n  ", flush=True)
         sys.exit(1)
