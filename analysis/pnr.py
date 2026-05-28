@@ -40,7 +40,7 @@ def make_pnr_top(dut_cls: Callable[[], wiring.Component]) -> wiring.Component:
             counter = Signal(16)
             m.d.sync += counter.eq(counter + 1)
 
-            outputs = []
+            output_regs = []
             input_idx = 0
             for name, member in dut.signature.members.items():
                 attr = getattr(dut, name)
@@ -52,10 +52,13 @@ def make_pnr_top(dut_cls: Callable[[], wiring.Component]) -> wiring.Component:
                         m.d.comb += v.eq(reg)
                         input_idx += 1
                 else:
-                    outputs.extend(values)
+                    for v in values:
+                        reg = Signal(len(v))
+                        m.d.sync += reg.eq(v)
+                        output_regs.append(reg)
 
             captured = Signal()
-            m.d.sync += captured.eq(Cat(*outputs).xor())
+            m.d.sync += captured.eq(Cat(*output_regs).xor())
             m.d.comb += self.result.eq(captured)
             return m
 
@@ -118,12 +121,39 @@ def parse_utilization(report_path: Path) -> dict[str, int]:
     return {cell: counts["used"] for cell, counts in data.get("utilization", {}).items() if counts.get("used", 0) > 0}
 
 
+PROJECT_FILE = re.compile(r"(/[\w/.-]*?(?:src|amaranth)/[\w/.-]+\.py:\d+)")
+
+
+def parse_critical_path(log: str) -> tuple[float, list[tuple[str, int]]]:
+    """Return (path_ns, ranked project source-file refs along the path)."""
+    in_path = False
+    total_ns = 0.0
+    file_hits: dict[str, int] = {}
+    for line in log.splitlines():
+        if "Critical path report" in line:
+            in_path = True
+            continue
+        if not in_path:
+            continue
+        if "Slack histogram" in line or "Max frequency" in line:
+            break
+        delay_match = re.match(r"Info:\s+\S+\s+[\d.]+\s+([\d.]+)\s+", line)
+        if delay_match:
+            total_ns = max(total_ns, float(delay_match.group(1)))
+        for ref in PROJECT_FILE.findall(line):
+            short = ref.rsplit("/src/", 1)[-1] if "/src/" in ref else ref.split("amaranth/")[-1]
+            file_hits[short] = file_hits.get(short, 0) + 1
+    ranked = sorted(file_hits.items(), key=lambda kv: -kv[1])
+    return total_ns, ranked
+
+
 INTERESTING_CELLS = ("TRELLIS_COMB", "TRELLIS_FF", "MULT18X18D", "DP16KD")
 
 
 def main() -> None:
     print(f"{'block':<12}{'fmax MHz':>10}" + "".join(f"{c:>14}" for c in INTERESTING_CELLS), flush=True)
     print("-" * (22 + 14 * len(INTERESTING_CELLS)), flush=True)
+    critical_paths: list[tuple[str, float, list[tuple[str, int]]]] = []
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp = Path(tmp_str)
         for block in BLOCKS:
@@ -133,8 +163,15 @@ def main() -> None:
             log = pnr(json_in, report)
             util = parse_utilization(report)
             fmax = parse_fmax(log)
+            path_ns, files = parse_critical_path(log)
             cells = "".join(f"{util.get(c, 0):>14}" for c in INTERESTING_CELLS)
             print(f"{block.name:<12}{(f'{fmax:.1f}' if fmax else '-'):>10}{cells}", flush=True)
+            critical_paths.append((block.name, path_ns, files))
+
+    print("\nCritical paths (top source files per block):", flush=True)
+    for name, path_ns, files in critical_paths:
+        top = ", ".join(f"{f} (x{n})" for f, n in files[:4]) or "(no project files found in path)"
+        print(f"  {name:<10} {path_ns:>6.2f} ns  {top}", flush=True)
 
 
 if __name__ == "__main__":
