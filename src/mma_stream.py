@@ -12,33 +12,15 @@ MAX_KBLOCKS = 16
 
 class State(enum.Enum, shape=3):
     IDLE = 0
-    FETCH = 1
-    LATCH = 2
+    FETCH0 = 1
+    LATCH0 = 2
     MAC = 3
     EVICT = 4
     DONE = 5
 
 
 class MMAUnit(wiring.Component):
-    """K-block streaming MMA. Speculative until cc4 pins the D-SRAM port shape.
-
-    Contract: K = 4 * kblocks (kblocks=0 encodes 16); operands stream from
-    consecutive D-SRAM slots starting at slot_a / slot_b; accumulate=1 keeps
-    the FixedPE accumulator state from the prior op (no reseed); evict=1 rounds
-    and writes back to slot_c.
-
-    Stubbed: acc0..acc3 select (single accumulator only), epilogue (add_en /
-    scale_en / act_sel), and BRAM read latency (assumed 1 cycle here).
-
-    TODO: overlap FETCH+LATCH of kb+1 with MAC of kb (double-buffer a_tile /
-    b_tile). Current per-kblock cost is 6 cycles (1 FETCH + 1 LATCH + 4 MAC);
-    overlapping drops it to 4 (MAC only), the theoretical minimum.
-
-    TODO (cc4 spec gap): D-SRAM port shape. This unit assumes one 256-bit read
-    per slot per cycle on each of two operand ports; cc4 ISA.md pins the slot
-    size (32 B = 256 b) but not the read-port width / burst pattern. Pin in
-    ISA.md "D-SRAM tile slots" section before fabbing.
-    """
+    """K-block streaming MMA, double-buffered tile fetch, K = 4 * kblocks (kblocks=0 means 16)."""
 
     def __init__(self):
         super().__init__(
@@ -69,26 +51,40 @@ class MMAUnit(wiring.Component):
             for j in range(N):
                 m.submodules[f"pe_{i}_{j}"] = pe[i][j]
 
-        a_tile = [Signal(BFloat16) for _ in range(N * N)]
-        b_tile = [Signal(BFloat16) for _ in range(N * N)]
+        a_tile = [[Signal(BFloat16, name=f"a_tile_{b}_{n}") for n in range(N * N)] for b in range(2)]
+        b_tile = [[Signal(BFloat16, name=f"b_tile_{b}_{n}") for n in range(N * N)] for b in range(2)]
 
         state = Signal(State)
-        # +1 width so kb_end can hold MAX_KBLOCKS (16) when kblocks==0
-        kb = Signal(range(MAX_KBLOCKS + 1))
+        # +1 width so kb_mac / kb_end can hold MAX_KBLOCKS (16) when kblocks==0
+        kb_mac = Signal(range(MAX_KBLOCKS + 1))
         kb_end = Signal(range(MAX_KBLOCKS + 1))
         k = Signal(range(N))
+        mac_buf = Signal()
         first_mac = Signal()
+        prefetch_kb = Signal(range(MAX_KBLOCKS + 1))
 
-        m.d.comb += self.rd_addr_a.eq(self.slot_a + kb)
-        m.d.comb += self.rd_addr_b.eq(self.slot_b + kb)
+        # TODO (cc4 spec gap): D-SRAM port shape (256-bit per slot per cycle, two read ports) -- pin in ISA.md.
+        with m.Switch(state):
+            with m.Case(State.MAC):
+                m.d.comb += prefetch_kb.eq(kb_mac + 1)
+            with m.Default():
+                m.d.comb += prefetch_kb.eq(0)
+        m.d.comb += self.rd_addr_a.eq(self.slot_a + prefetch_kb)
+        m.d.comb += self.rd_addr_b.eq(self.slot_b + prefetch_kb)
 
         with m.Switch(k):
             for k_val in range(N):
                 with m.Case(k_val):
                     for i in range(N):
                         for j in range(N):
-                            m.d.comb += pe[i][j].a.eq(a_tile[i * N + k_val])
-                            m.d.comb += pe[i][j].b.eq(b_tile[k_val * N + j])
+                            a_sel = Mux(
+                                mac_buf, a_tile[1][i * N + k_val].as_value(), a_tile[0][i * N + k_val].as_value()
+                            )
+                            b_sel = Mux(
+                                mac_buf, b_tile[1][k_val * N + j].as_value(), b_tile[0][k_val * N + j].as_value()
+                            )
+                            m.d.comb += pe[i][j].a.as_value().eq(a_sel)
+                            m.d.comb += pe[i][j].b.as_value().eq(b_sel)
 
         def set_all(load, enable):
             for i in range(N):
@@ -96,36 +92,50 @@ class MMAUnit(wiring.Component):
                     m.d.comb += pe[i][j].load.eq(load)
                     m.d.comb += pe[i][j].enable.eq(enable)
 
+        def latch_buf(buf_idx: int):
+            for n in range(N * N):
+                m.d.sync += a_tile[buf_idx][n].as_value().eq(self.rd_data_a[n * 16 : (n + 1) * 16])
+                m.d.sync += b_tile[buf_idx][n].as_value().eq(self.rd_data_b[n * 16 : (n + 1) * 16])
+
         with m.Switch(state):
             with m.Case(State.IDLE):
                 set_all(load=0, enable=0)
                 with m.If(self.start):
-                    m.d.sync += state.eq(State.FETCH)
-                    m.d.sync += kb.eq(0)
+                    m.d.sync += state.eq(State.FETCH0)
+                    m.d.sync += kb_mac.eq(0)
                     m.d.sync += kb_end.eq(Mux(self.kblocks == 0, MAX_KBLOCKS, self.kblocks))
+                    m.d.sync += mac_buf.eq(0)
                     m.d.sync += first_mac.eq(~self.accumulate)
 
-            with m.Case(State.FETCH):
+            with m.Case(State.FETCH0):
                 set_all(load=0, enable=0)
-                m.d.sync += state.eq(State.LATCH)
+                m.d.sync += state.eq(State.LATCH0)
 
-            with m.Case(State.LATCH):
+            with m.Case(State.LATCH0):
                 set_all(load=0, enable=0)
-                for n in range(N * N):
-                    m.d.sync += a_tile[n].as_value().eq(self.rd_data_a[n * 16 : (n + 1) * 16])
-                    m.d.sync += b_tile[n].as_value().eq(self.rd_data_b[n * 16 : (n + 1) * 16])
+                latch_buf(0)
                 m.d.sync += k.eq(0)
                 m.d.sync += state.eq(State.MAC)
 
             with m.Case(State.MAC):
                 set_all(load=first_mac, enable=~first_mac)
                 m.d.sync += first_mac.eq(0)
+
+                # Prefetch of kb_mac+1 lands one cycle after rd_addr appears,
+                # which is k==1 (rd_addr is combinational from prefetch_kb).
+                with m.If((k == 1) & (kb_mac + 1 < kb_end)):
+                    with m.If(mac_buf == 0):
+                        latch_buf(1)
+                    with m.Else():
+                        latch_buf(0)
+
                 with m.If(k == N - 1):
-                    with m.If(kb + 1 == kb_end):
+                    with m.If(kb_mac + 1 == kb_end):
                         m.d.sync += state.eq(Mux(self.evict, State.EVICT, State.DONE))
                     with m.Else():
-                        m.d.sync += kb.eq(kb + 1)
-                        m.d.sync += state.eq(State.FETCH)
+                        m.d.sync += kb_mac.eq(kb_mac + 1)
+                        m.d.sync += mac_buf.eq(~mac_buf)
+                        m.d.sync += k.eq(0)
                 with m.Else():
                     m.d.sync += k.eq(k + 1)
 

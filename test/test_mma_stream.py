@@ -101,11 +101,7 @@ def run_stream(A, B, kblocks: int, request, kblocks_encoded: int | None = None) 
 
 
 def run_chain(ops, request) -> np.ndarray:
-    """Run a sequence of MMAs on one DUT, accumulator state persisting between ops.
-
-    ops: list of (A, B, kblocks, accumulate, evict). Only the evicting op
-    produces wr_data; the test should pass evict=True on the last op only.
-    """
+    """Run [(A, B, kblocks, accumulate, evict), ...] on one DUT; only the evict op produces wr_data."""
     dut = MMAUnit()
     slot_a, slot_b, slot_c = 8, 16, 32
     captured: dict[str, np.ndarray] = {}
@@ -188,7 +184,6 @@ def test_kblocks_16_max(request):
 
 
 def test_kblocks_zero_means_sixteen(request):
-    """kblocks is 4 bits wide, so K=64 is only reachable via the kblocks=0 encoding."""
     np.random.seed(13)
     K = N * 16
     A = np.random.randn(N, K).astype(np.float32) * 0.1
@@ -196,9 +191,53 @@ def test_kblocks_zero_means_sixteen(request):
     assert_bit_exact(run_stream(A, B, 16, request, kblocks_encoded=0), bf16_matmul(A, B))
 
 
+def cycles_to_done(kblocks: int) -> int:
+    dut = MMAUnit()
+    K = N * kblocks
+    rng = np.random.default_rng(0)
+    A = rng.standard_normal((N, K)).astype(np.float32) * 0.1
+    B = rng.standard_normal((K, N)).astype(np.float32) * 0.1
+    a_tiles = split_into_kblocks(A, "a", kblocks)
+    b_tiles = split_into_kblocks(B, "b", kblocks)
+    slot_a, slot_b, slot_c = 8, 16, 32
+    a_mem = {slot_a + kb: pack_tile(a_tiles[kb]) for kb in range(kblocks)}
+    b_mem = {slot_b + kb: pack_tile(b_tiles[kb]) for kb in range(kblocks)}
+    measured: dict[str, int] = {}
+
+    async def bench(ctx):
+        ctx.set(dut.slot_a, slot_a)
+        ctx.set(dut.slot_b, slot_b)
+        ctx.set(dut.slot_c, slot_c)
+        ctx.set(dut.kblocks, kblocks % 16)
+        ctx.set(dut.evict, 1)
+        ctx.set(dut.accumulate, 0)
+        ctx.set(dut.start, 1)
+
+        for cyc in range(MAX_CYCLES):
+            ctx.set(dut.rd_data_a, a_mem.get(ctx.get(dut.rd_addr_a), 0))
+            ctx.set(dut.rd_data_b, b_mem.get(ctx.get(dut.rd_addr_b), 0))
+            if ctx.get(dut.done):
+                measured["cyc"] = cyc
+                break
+            await ctx.tick()
+        assert "cyc" in measured, "never reached done"
+
+    sim = Simulator(dut)
+    sim.add_clock(Period(us=1))
+    sim.add_testbench(bench)
+    sim.run()
+    return measured["cyc"]
+
+
+def test_cycle_budget_per_kblock():
+    for kblocks in (1, 2, 4, 16):
+        expected = 4 * kblocks + 4  # 2 warmup + 4 per kblock + EVICT + DONE
+        actual = cycles_to_done(kblocks)
+        assert actual == expected, f"kblocks={kblocks}: expected {expected} cycles, got {actual}"
+
+
 def test_accumulate_chain_matches_single_mma(request):
-    """Two chained kblocks=2 ops with accumulate=1 must equal one kblocks=4 op
-    (FP32 acc persists across the chain; no mid-chain BF16 round)."""
+    # Chain (K=8 acc=0) + (K=8 acc=1, evict) == single K=16; proves no mid-chain BF16 round.
     np.random.seed(17)
     K = N * 4
     A = np.random.randn(N, K).astype(np.float32) * 0.2

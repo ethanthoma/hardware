@@ -1,7 +1,7 @@
 [project]
 name = "hardware"
 version = "0.1.0"
-description = "A bfloat16 tensor core in Amaranth HDL: an 8x8 systolic MAC array computing D = A·B + C with extended-precision accumulation."
+description = "A bfloat16 tensor core in Amaranth HDL: a 4x4 MAC array (no sweep) with K-block streaming, fixed-point extended-precision accumulation, and round-to-bf16 on evict."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["amaranth[builtin-yosys]>=0.5.8", "numpy>=2.3.4"]
