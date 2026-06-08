@@ -6,17 +6,12 @@ from typing import Callable, NamedTuple
 from amaranth.back import rtlil
 from amaranth.lib import wiring
 
-from aligner import Aligner
-from bf16_mac import BF16_MAC
 from carry_select_adder import CarrySelectAdder, CarrySelectSubtractor
 from fixed_pe import FixedMAC, FixedPE
-from fused_exp_diff import FusedExponentDifference
-from lza import LeadingZeroAnticipator
 from mantissa_multiplier import MantissaMultiplier
 from mma import MMA
 from normalizer import Normalizer
 from parallel_prefix import KoggeStone
-from pe_mac import PE_MAC
 from rounder import Rounder
 
 
@@ -38,13 +33,8 @@ BLOCKS = [
     Block("CarrySelectAdder", lambda: CarrySelectAdder(26, 6), True),
     Block("CarrySelectSubtractor", lambda: CarrySelectSubtractor(26, 6), True),
     Block("MantissaMultiplier", MantissaMultiplier, True),
-    Block("Aligner", lambda: Aligner(26), True),
     Block("Normalizer", lambda: Normalizer(26), True),
-    Block("LeadingZeroAnticipator", lambda: LeadingZeroAnticipator(26), True),
     Block("Rounder", lambda: Rounder(7), True),
-    Block("FusedExponentDifference", FusedExponentDifference, True),
-    Block("BF16_MAC", BF16_MAC, True),
-    Block("PE_MAC", PE_MAC, False),
     Block("MMA", MMA, False),
     Block("FixedMAC", FixedMAC, True),
     Block("FixedPE", FixedPE, False),
