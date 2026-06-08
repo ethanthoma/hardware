@@ -150,7 +150,7 @@ def parse_critical_path(log: str) -> tuple[float, list[tuple[str, int]]]:
 
 INTERESTING_CELLS = ("TRELLIS_COMB", "TRELLIS_FF", "MULT18X18D", "DP16KD")
 
-FMAX_FLOORS_MHZ = {"MMA": 50.0, "FixedPE": 55.0}
+FMAX_FLOORS_MHZ = {"MMA": 55.0, "FixedPE": 75.0}
 
 
 def main() -> None:

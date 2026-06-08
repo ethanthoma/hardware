@@ -23,6 +23,9 @@ def aligned_addend(m: Module, a, b) -> Signal:
     m.d.comb += mult.b_mant.eq(b.mantissa)
 
     sign = a.sign ^ b.sign
+    # TODO: no Inf/NaN handling. The exponent==255 is treated as a finite number, so
+    # Inf/NaN operands produce garbage rather than propagating. Subnormals (exponent==0,
+    # mantissa!=0) flush to zero here.
     zero = (a.exponent == 0) | (b.exponent == 0)
 
     shift = Signal(signed(12))
@@ -31,6 +34,10 @@ def aligned_addend(m: Module, a, b) -> Signal:
     prod = Signal(WIDTH)
     m.d.comb += prod.eq(Mux(zero, 0, mult.product))
 
+    # TODO: out-of-window products are silently dropped to 0 (too-large ones vanish rather than
+    # saturate), and the wide accumulate can wrap past 2**(WIDTH-1) with no signal. Surface a
+    # sticky saturated flag at EVICT instead. OR (~in_window & ~zero) across the K-stream plus a
+    # guard-bit overflow check at drain. Keep it off the accumulate path (now the Fmax limiter).
     in_window = Signal()
     m.d.comb += in_window.eq((shift >= 0) & (shift <= MAX_SHIFT))
     shamt = Signal(6)
@@ -45,7 +52,7 @@ def aligned_addend(m: Module, a, b) -> Signal:
 
 
 class FixedMAC(wiring.Component):
-    """Combinational MAC: acc_out = acc_in + align(a*b). Depth proxy vs BF16_MAC."""
+    """Combinational MAC: acc_out = acc_in + align(a*b). Per-cycle depth proxy for the grid PE."""
 
     a: In(BFloat16)
     b: In(BFloat16)
@@ -71,6 +78,7 @@ class FixedPE(wiring.Component):
     load: In(1)
     enable: In(1)
     result: Out(BFloat16)
+    result_valid: Out(1)
 
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
@@ -80,4 +88,5 @@ class FixedPE(wiring.Component):
         m.d.comb += acc.load.eq(self.load)
         m.d.comb += acc.enable.eq(self.enable)
         m.d.comb += self.result.eq(acc.result)
+        m.d.comb += self.result_valid.eq(acc.result_valid)
         return m

@@ -15,8 +15,9 @@ class State(enum.Enum, shape=3):
     FETCH0 = 1
     LATCH0 = 2
     MAC = 3
-    EVICT = 4
-    DONE = 5
+    DRAIN = 4  # hold acc one cycle so the pipelined drain settles before EVICT reads result
+    EVICT = 5
+    DONE = 6
 
 
 class MMAUnit(wiring.Component):
@@ -131,13 +132,17 @@ class MMAUnit(wiring.Component):
 
                 with m.If(k == N - 1):
                     with m.If(kb_mac + 1 == kb_end):
-                        m.d.sync += state.eq(Mux(self.evict, State.EVICT, State.DONE))
+                        m.d.sync += state.eq(Mux(self.evict, State.DRAIN, State.DONE))
                     with m.Else():
                         m.d.sync += kb_mac.eq(kb_mac + 1)
                         m.d.sync += mac_buf.eq(~mac_buf)
                         m.d.sync += k.eq(0)
                 with m.Else():
                     m.d.sync += k.eq(k + 1)
+
+            with m.Case(State.DRAIN):
+                set_all(load=0, enable=0)
+                m.d.sync += state.eq(State.EVICT)
 
             with m.Case(State.EVICT):
                 # TODO: epilogue (add_en + slot_c read; scale_en; act_sel) -- currently round-and-write only

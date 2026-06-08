@@ -231,7 +231,7 @@ def cycles_to_done(kblocks: int) -> int:
 
 def test_cycle_budget_per_kblock():
     for kblocks in (1, 2, 4, 16):
-        expected = 4 * kblocks + 4  # 2 warmup + 4 per kblock + EVICT + DONE
+        expected = 4 * kblocks + 5  # 2 warmup + 4 per kblock + DRAIN + EVICT + DONE
         actual = cycles_to_done(kblocks)
         assert actual == expected, f"kblocks={kblocks}: expected {expected} cycles, got {actual}"
 

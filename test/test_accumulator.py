@@ -17,7 +17,11 @@ def run(dut, ops):
             ctx.set(dut.enable, kind == "add")
             ctx.set(dut.addend, addend)
             await ctx.tick()
+        ctx.set(dut.load, 0)
+        ctx.set(dut.enable, 0)
+        await ctx.tick()  # drain is pipelined one cycle behind acc; hold then settle
         out["value"] = ctx.get(dut.value)
+        out["result_valid"] = ctx.get(dut.result_valid)
         r = ctx.get(dut.result)
         out["result"] = BF16.pack(r["sign"], r["exponent"], r["mantissa"]).to_float()
 
@@ -65,3 +69,8 @@ def test_accumulate_then_drain():
     out = run(Accumulator(width=32, lsb_exp=0), [("load", 8), ("add", 4), ("add", 4)])
     assert out["value"] == 16
     assert out["result"] == 16.0
+
+
+def test_result_valid_after_settle():
+    out = run(Accumulator(width=32, lsb_exp=0), [("load", 12)])
+    assert out["result_valid"] == 1
