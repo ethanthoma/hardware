@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "A bfloat16 tensor core in Amaranth HDL: a 4x4 MAC array (no sweep) with K-block streaming, fixed-point extended-precision accumulation, and round-to-bf16 on evict."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["amaranth[builtin-yosys]>=0.5.8", "numpy>=2.3.4"]
+dependencies = [
+  "amaranth[builtin-yosys]>=0.5.8",
+  "amaranth-boards",
+  "numpy>=2.3.4",
+]
 
 [dependency-groups]
 dev = ["pytest>=8.4.2"]
@@ -38,6 +42,7 @@ no-binary-package = ["numpy"]
 
 [tool.uv.sources]
 amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
+amaranth-boards = { git = "https://github.com/amaranth-lang/amaranth-boards.git" }
 
 [tool.pyrefly]
 search_path = ["src"]

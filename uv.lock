@@ -18,6 +18,14 @@ builtin-yosys = [
 ]
 
 [[package]]
+name = "amaranth-boards"
+version = "0.0.11"
+source = { git = "https://github.com/amaranth-lang/amaranth-boards.git#8bc91db6f68c5c36f30926bf56836739c138986f" }
+dependencies = [
+    { name = "amaranth" },
+]
+
+[[package]]
 name = "amaranth-yosys"
 version = "0.50.0.0.post117"
 source = { registry = "https://pypi.org/simple" }
@@ -43,6 +51,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "amaranth", extra = ["builtin-yosys"] },
+    { name = "amaranth-boards" },
     { name = "numpy" },
 ]
 
@@ -54,6 +63,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "amaranth", extras = ["builtin-yosys"], git = "https://github.com/amaranth-lang/amaranth.git" },
+    { name = "amaranth-boards", git = "https://github.com/amaranth-lang/amaranth-boards.git" },
     { name = "numpy", specifier = ">=2.3.4" },
 ]
 

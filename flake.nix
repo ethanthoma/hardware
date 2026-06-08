@@ -70,6 +70,7 @@
               { package = pkgs.yosys; }
               { package = pkgs.nextpnr; }
               { package = pkgs.trellis; }
+              { package = pkgs.openfpgaloader; }
             ];
           };
         };

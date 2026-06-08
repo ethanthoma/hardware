@@ -15,7 +15,7 @@ from fixed_pe import FixedPE
 from mma import MMA
 
 DEVICE = "um5g-85k"
-PACKAGE = "CABGA756"
+PACKAGE = "CABGA381"  # LFE5UM5G-85F-8BG381C on the ECP5-5G EVN board
 SPEED = "8"
 TARGET_MHZ = 100
 
