@@ -22,6 +22,7 @@ def run(dut, ops):
         await ctx.tick()  # drain is pipelined one cycle behind acc; hold then settle
         out["value"] = ctx.get(dut.value)
         out["result_valid"] = ctx.get(dut.result_valid)
+        out["any_overflow"] = ctx.get(dut.any_overflow)
         r = ctx.get(dut.result)
         out["result"] = BF16.pack(r["sign"], r["exponent"], r["mantissa"]).to_float()
 
@@ -74,3 +75,19 @@ def test_accumulate_then_drain():
 def test_result_valid_after_settle():
     out = run(Accumulator(width=32, lsb_exp=0), [("load", 12)])
     assert out["result_valid"] == 1
+
+
+def test_overflow_flag_on_wrap():
+    # signed(10) tops out at 511; 400 + 200 wraps -> overflow flag sticks
+    out = run(Accumulator(width=10, lsb_exp=0), [("load", 400), ("add", 200)])
+    assert out["any_overflow"] == 1
+
+
+def test_no_overflow_in_range():
+    out = run(Accumulator(width=10, lsb_exp=0), [("load", 200), ("add", 100)])
+    assert out["any_overflow"] == 0
+
+
+def test_load_clears_overflow():
+    out = run(Accumulator(width=10, lsb_exp=0), [("load", 400), ("add", 200), ("load", 5)])
+    assert out["any_overflow"] == 0

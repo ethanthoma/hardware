@@ -48,6 +48,48 @@ def run_fixed_pe(pairs: list[tuple[float, float]]) -> float:
     return captured["result"]
 
 
+def run_fixed_pe_flags(pairs: list[tuple[float, float]]) -> tuple[bool, bool]:
+    """Run the PE over pairs; return (any_dropped, any_overflow) sticky flags after the flush."""
+    dut = FixedPE()
+    out = {}
+
+    async def bench(ctx):
+        for i, (a_val, b_val) in enumerate(pairs):
+            sa, ea, ma = BF16.from_float(a_val).unpack()
+            sb, eb, mb = BF16.from_float(b_val).unpack()
+            ctx.set(dut.a, {"sign": sa, "exponent": ea, "mantissa": ma})
+            ctx.set(dut.b, {"sign": sb, "exponent": eb, "mantissa": mb})
+            ctx.set(dut.load, 1 if i == 0 else 0)
+            ctx.set(dut.enable, 0 if i == 0 else 1)
+            await ctx.tick()
+        ctx.set(dut.load, 0)
+        ctx.set(dut.enable, 0)
+        await ctx.tick()  # flush the pipelined addend into acc (and its sticky flags)
+        out["dropped"] = bool(ctx.get(dut.any_dropped))
+        out["overflow"] = bool(ctx.get(dut.any_overflow))
+
+    sim = Simulator(dut)
+    sim.add_clock(Period(us=1))
+    sim.add_testbench(bench)
+    sim.run()
+    return out["dropped"], out["overflow"]
+
+
+def test_in_window_trips_no_flags():
+    assert run_fixed_pe_flags([(1.5, 2.0), (1.0, 1.0)]) == (False, False)
+
+
+def test_out_of_window_product_sets_dropped():
+    dropped, overflow = run_fixed_pe_flags([(1.0, 1.0), (2.0**10, 2.0**10)])
+    assert dropped and not overflow
+
+
+def test_accumulator_wrap_sets_overflow():
+    # four in-window products at value 2**13 (magnitude 2**45) sum to 2**47 -> wraps signed(48)
+    dropped, overflow = run_fixed_pe_flags([(128.0, 64.0)] * 4)
+    assert overflow and not dropped
+
+
 def drain_once_reference(pairs: list[tuple[float, float]]) -> float:
     """FixedPE's contract: bf16-truncate operands, accumulate exactly, RTNE-cast once."""
     acc = sum(BF16.from_float(a).to_float() * BF16.from_float(b).to_float() for a, b in pairs)

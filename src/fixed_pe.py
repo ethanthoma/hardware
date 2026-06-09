@@ -16,8 +16,9 @@ GRID_ALIGN = 2 * BIAS + PRODUCT_FRAC_BITS + LSB_EXP
 MAX_SHIFT = WIDTH - 17  # WIDTH-16 for product width, -1 for the sign bit
 
 
-def aligned_addend(m: Module, a, b) -> Signal:
-    """Return a*b as a signed fixed-point addend on the LSB_EXP-weighted grid."""
+def aligned_addend(m: Module, a, b):
+    """Return (addend, dropped): a*b as a signed fixed-point addend on the LSB_EXP-weighted grid,
+    and a flag that the (non-zero) product fell outside the alignment window and was forced to 0."""
     m.submodules.mult = mult = MantissaMultiplier()
     m.d.comb += mult.a_mant.eq(a.mantissa)
     m.d.comb += mult.b_mant.eq(b.mantissa)
@@ -34,10 +35,6 @@ def aligned_addend(m: Module, a, b) -> Signal:
     prod = Signal(WIDTH)
     m.d.comb += prod.eq(Mux(zero, 0, mult.product))
 
-    # TODO: out-of-window products are silently dropped to 0 (too-large ones vanish rather than
-    # saturate), and the wide accumulate can wrap past 2**(WIDTH-1) with no signal. Surface a
-    # sticky saturated flag at EVICT instead. OR (~in_window & ~zero) across the K-stream plus a
-    # guard-bit overflow check at drain. Keep it off the accumulate path (now the Fmax limiter).
     in_window = Signal()
     m.d.comb += in_window.eq((shift >= 0) & (shift <= MAX_SHIFT))
     shamt = Signal(6)
@@ -48,7 +45,10 @@ def aligned_addend(m: Module, a, b) -> Signal:
 
     addend = Signal(signed(WIDTH))
     m.d.comb += addend.eq(Mux(sign, -magnitude, magnitude))
-    return addend
+
+    dropped = Signal()
+    m.d.comb += dropped.eq(~in_window & ~zero)
+    return addend, dropped
 
 
 class FixedMAC(wiring.Component):
@@ -61,7 +61,7 @@ class FixedMAC(wiring.Component):
 
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
-        addend = aligned_addend(m, self.a, self.b)
+        addend, _ = aligned_addend(m, self.a, self.b)
         m.submodules.add = add = CarrySelectAdder(WIDTH, 6)
         m.d.comb += add.a.eq(self.acc_in.as_unsigned())
         m.d.comb += add.b.eq(addend.as_unsigned())
@@ -81,22 +81,29 @@ class FixedPE(wiring.Component):
     enable: In(1)
     result: Out(BFloat16)
     result_valid: Out(1)
+    any_dropped: Out(1)
+    any_overflow: Out(1)
 
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
-        addend = aligned_addend(m, self.a, self.b)
+        addend, dropped = aligned_addend(m, self.a, self.b)
 
         addend_r = Signal(signed(WIDTH))
+        dropped_r = Signal()
         load_r = Signal()
         enable_r = Signal()
         m.d.sync += addend_r.eq(addend)
+        m.d.sync += dropped_r.eq(dropped)
         m.d.sync += load_r.eq(self.load)
         m.d.sync += enable_r.eq(self.enable)
 
         m.submodules.acc = acc = Accumulator(width=WIDTH, lsb_exp=LSB_EXP)
         m.d.comb += acc.addend.eq(addend_r)
+        m.d.comb += acc.addend_dropped.eq(dropped_r)
         m.d.comb += acc.load.eq(load_r)
         m.d.comb += acc.enable.eq(enable_r)
         m.d.comb += self.result.eq(acc.result)
         m.d.comb += self.result_valid.eq(acc.result_valid)
+        m.d.comb += self.any_dropped.eq(acc.any_dropped)
+        m.d.comb += self.any_overflow.eq(acc.any_overflow)
         return m

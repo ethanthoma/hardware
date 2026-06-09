@@ -26,6 +26,8 @@ class MMA(wiring.Component):
                 "start": In(1),
                 "done": Out(1),
                 "d_matrix": Out(BFloat16).array(N * N),
+                "any_dropped": Out(1),
+                "any_overflow": Out(1),
             }
         )
 
@@ -91,5 +93,8 @@ class MMA(wiring.Component):
         for i in range(N):
             for j in range(N):
                 m.d.comb += self.d_matrix[i * N + j].eq(pe[i][j].result)
+
+        m.d.comb += self.any_dropped.eq(Cat(pe[i][j].any_dropped for i in range(N) for j in range(N)).any())
+        m.d.comb += self.any_overflow.eq(Cat(pe[i][j].any_overflow for i in range(N) for j in range(N)).any())
 
         return m

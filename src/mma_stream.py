@@ -42,6 +42,8 @@ class MMAUnit(wiring.Component):
                 "wr_addr": Out(6),
                 "wr_data": Out(TILE_BITS),
                 "wr_en": Out(1),
+                "any_dropped": Out(1),  # sticky across the K-stream: a product was out-of-window
+                "any_overflow": Out(1),  # sticky across the K-stream: an accumulator wrapped
             }
         )
 
@@ -164,5 +166,8 @@ class MMAUnit(wiring.Component):
                 m.d.comb += self.done.eq(1)
                 with m.If(~self.start):
                     m.d.sync += state.eq(State.IDLE)
+
+        m.d.comb += self.any_dropped.eq(Cat(pe[i][j].any_dropped for i in range(N) for j in range(N)).any())
+        m.d.comb += self.any_overflow.eq(Cat(pe[i][j].any_overflow for i in range(N) for j in range(N)).any())
 
         return m
