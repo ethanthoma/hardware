@@ -71,7 +71,9 @@ class FixedMAC(wiring.Component):
 
 
 class FixedPE(wiring.Component):
-    """Registered PE: multiply, align, accumulate; drains to bf16."""
+    """Registered PE: pipelined multiply+align, accumulate, drain to bf16. The addend and its
+    control register one cycle ahead of the add, so the per-cycle loop is just `acc + addend` and the
+    operands accumulate one cycle behind their presentation (consumers flush a trailing cycle)."""
 
     a: In(BFloat16)
     b: In(BFloat16)
@@ -83,10 +85,18 @@ class FixedPE(wiring.Component):
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
         addend = aligned_addend(m, self.a, self.b)
+
+        addend_r = Signal(signed(WIDTH))
+        load_r = Signal()
+        enable_r = Signal()
+        m.d.sync += addend_r.eq(addend)
+        m.d.sync += load_r.eq(self.load)
+        m.d.sync += enable_r.eq(self.enable)
+
         m.submodules.acc = acc = Accumulator(width=WIDTH, lsb_exp=LSB_EXP)
-        m.d.comb += acc.addend.eq(addend)
-        m.d.comb += acc.load.eq(self.load)
-        m.d.comb += acc.enable.eq(self.enable)
+        m.d.comb += acc.addend.eq(addend_r)
+        m.d.comb += acc.load.eq(load_r)
+        m.d.comb += acc.enable.eq(enable_r)
         m.d.comb += self.result.eq(acc.result)
         m.d.comb += self.result_valid.eq(acc.result_valid)
         return m

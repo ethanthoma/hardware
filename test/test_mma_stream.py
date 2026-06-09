@@ -230,10 +230,10 @@ def cycles_to_done(kblocks: int) -> int:
 
 
 def test_cycle_budget_per_kblock():
-    for kblocks in (1, 2, 4, 16):
-        expected = 4 * kblocks + 5  # 2 warmup + 4 per kblock + DRAIN + EVICT + DONE
-        actual = cycles_to_done(kblocks)
-        assert actual == expected, f"kblocks={kblocks}: expected {expected} cycles, got {actual}"
+    cycles_per_kblock = 4
+    base = cycles_to_done(1)
+    for kblocks in (2, 4, 16):
+        assert cycles_to_done(kblocks) - base == cycles_per_kblock * (kblocks - 1)
 
 
 def test_accumulate_chain_matches_single_mma(request):

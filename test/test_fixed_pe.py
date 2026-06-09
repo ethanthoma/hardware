@@ -36,6 +36,7 @@ def run_fixed_pe(pairs: list[tuple[float, float]]) -> float:
             await ctx.tick()
         ctx.set(dut.load, 0)
         ctx.set(dut.enable, 0)
+        await ctx.tick()  # flush the pipelined addend into acc
         await ctx.tick()  # drain is pipelined one cycle behind acc; hold then settle
         r = ctx.get(dut.result)
         captured["result"] = BF16.pack(r["sign"], r["exponent"], r["mantissa"]).to_float()

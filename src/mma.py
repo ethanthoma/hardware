@@ -9,11 +9,12 @@ from fixed_pe import FixedPE
 N = 4
 
 
-class State(enum.Enum, shape=2):
+class State(enum.Enum, shape=3):
     IDLE = 0
     MAC = 1
-    DRAIN = 2  # hold acc one cycle so the pipelined drain settles before DONE reads result
-    DONE = 3
+    FLUSH = 2  # let the last pipelined product reach acc before draining
+    DRAIN = 3  # hold acc one cycle so the pipelined drain settles before DONE reads result
+    DONE = 4
 
 
 class MMA(wiring.Component):
@@ -67,9 +68,14 @@ class MMA(wiring.Component):
                 accumulate_subsequent = k != 0
                 set_all(load=seed_first_product, enable=accumulate_subsequent)
                 with m.If(k == N - 1):
-                    m.d.sync += state.eq(State.DRAIN)
+                    m.d.sync += state.eq(State.FLUSH)
                 with m.Else():
                     m.d.sync += k.eq(k + 1)
+
+            with m.Case(State.FLUSH):
+                m.d.comb += self.done.eq(0)
+                set_all(load=0, enable=0)
+                m.d.sync += state.eq(State.DRAIN)
 
             with m.Case(State.DRAIN):
                 m.d.comb += self.done.eq(0)

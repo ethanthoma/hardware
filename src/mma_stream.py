@@ -15,9 +15,10 @@ class State(enum.Enum, shape=3):
     FETCH0 = 1
     LATCH0 = 2
     MAC = 3
-    DRAIN = 4  # hold acc one cycle so the pipelined drain settles before EVICT reads result
-    EVICT = 5
-    DONE = 6
+    FLUSH = 4  # let the last pipelined product reach acc before draining
+    DRAIN = 5  # hold acc one cycle so the pipelined drain settles before EVICT reads result
+    EVICT = 6
+    DONE = 7
 
 
 class MMAUnit(wiring.Component):
@@ -132,13 +133,17 @@ class MMAUnit(wiring.Component):
 
                 with m.If(k == N - 1):
                     with m.If(kb_mac + 1 == kb_end):
-                        m.d.sync += state.eq(Mux(self.evict, State.DRAIN, State.DONE))
+                        m.d.sync += state.eq(State.FLUSH)
                     with m.Else():
                         m.d.sync += kb_mac.eq(kb_mac + 1)
                         m.d.sync += mac_buf.eq(~mac_buf)
                         m.d.sync += k.eq(0)
                 with m.Else():
                     m.d.sync += k.eq(k + 1)
+
+            with m.Case(State.FLUSH):
+                set_all(load=0, enable=0)
+                m.d.sync += state.eq(Mux(self.evict, State.DRAIN, State.DONE))
 
             with m.Case(State.DRAIN):
                 set_all(load=0, enable=0)
