@@ -3,8 +3,8 @@
 A bfloat16 matrix multiply-accumulate (MMA) unit written in
 [Amaranth HDL](https://github.com/amaranth-lang/amaranth).
 
-It builds bottom-up from arithmetic primitives to a 4×4×4 MAC array (`MMA`)
-that computes `D = A·B + C` over bf16 matrices, accumulating in extended (26-bit
+It builds bottom-up from arithmetic primitives to a 4×4×4 MAC array (`MMA`) that
+computes `D = A·B + C` over bf16 matrices, accumulating in extended (26-bit
 mantissa) precision and rounding to bf16 only at the output.
 
 ## Setup
@@ -28,6 +28,16 @@ uv run pytest test/ --vcd           # also dump .vcd waveforms
 ```bash
 ruff check --fix && ruff format
 ```
+
+## Run on the board
+
+```bash
+scripts/run.sh             # build analysis/mma_flags.py and load it onto the ECP5-5G EVN
+scripts/run.sh mma_led     # any analysis/ board top
+scripts/run.sh blink -f    # -f writes SPI flash instead of volatile SRAM
+```
+
+Each top is self-checking on the LEDs — see its docstring for the legend.
 
 ## Layout
 
