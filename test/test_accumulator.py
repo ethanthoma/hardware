@@ -91,3 +91,48 @@ def test_no_overflow_in_range():
 def test_load_clears_overflow():
     out = run(Accumulator(width=10, lsb_exp=0), [("load", 400), ("add", 200), ("load", 5)])
     assert out["any_overflow"] == 0
+
+
+def run_banked(dut, ops, read_sel):
+    """ops: list of ("load"|"add", addend, acc_sel). Returns value/result/flags of read_sel after settling."""
+    out = {}
+
+    async def bench(ctx):
+        for kind, addend, sel in ops:
+            ctx.set(dut.acc_sel, sel)
+            ctx.set(dut.load, kind == "load")
+            ctx.set(dut.enable, kind == "add")
+            ctx.set(dut.addend, addend)
+            await ctx.tick()
+        ctx.set(dut.load, 0)
+        ctx.set(dut.enable, 0)
+        ctx.set(dut.acc_sel, read_sel)
+        await ctx.tick()  # drain is pipelined one cycle behind the selected bank
+        out["value"] = ctx.get(dut.value)
+        out["any_overflow"] = ctx.get(dut.any_overflow)
+        r = ctx.get(dut.result)
+        out["result"] = BF16.pack(r["sign"], r["exponent"], r["mantissa"]).to_float()
+
+    sim = Simulator(dut)
+    sim.add_clock(Period(us=1))
+    sim.add_testbench(bench)
+    sim.run()
+    return out
+
+
+def test_banks_accumulate_independently():
+    ops = [("load", 5, 0), ("load", 100, 1), ("add", 3, 0), ("add", -50, 1)]
+    assert run_banked(Accumulator(width=32, lsb_exp=0), ops, 0)["value"] == 8
+    assert run_banked(Accumulator(width=32, lsb_exp=0), ops, 1)["value"] == 50
+
+
+def test_drain_reads_selected_bank():
+    ops = [("load", 12, 0), ("load", 7, 2)]
+    assert run_banked(Accumulator(width=32, lsb_exp=0), ops, 0)["result"] == 12.0
+    assert run_banked(Accumulator(width=32, lsb_exp=0), ops, 2)["result"] == 7.0
+
+
+def test_overflow_sticks_per_bank():
+    ops = [("load", 200, 0), ("load", 400, 1), ("add", 200, 1)]
+    assert run_banked(Accumulator(width=10, lsb_exp=0), ops, 1)["any_overflow"] == 1
+    assert run_banked(Accumulator(width=10, lsb_exp=0), ops, 0)["any_overflow"] == 0

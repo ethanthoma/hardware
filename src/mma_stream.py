@@ -30,6 +30,7 @@ class MMAUnit(wiring.Component):
                 "start": In(1),
                 "accumulate": In(1),
                 "evict": In(1),
+                "acc_d": In(2),  # acc0..acc3; held stable from start to done
                 "kblocks": In(4),
                 "slot_a": In(6),
                 "slot_b": In(6),
@@ -42,8 +43,8 @@ class MMAUnit(wiring.Component):
                 "wr_addr": Out(6),
                 "wr_data": Out(TILE_BITS),
                 "wr_en": Out(1),
-                "any_dropped": Out(1),  # sticky across the K-stream: a product was out-of-window
-                "any_overflow": Out(1),  # sticky across the K-stream: an accumulator wrapped
+                "any_dropped": Out(1),  # sticky for the selected acc_d chain: a product was out-of-window
+                "any_overflow": Out(1),  # sticky for the selected acc_d chain: an accumulator wrapped
             }
         )
 
@@ -54,6 +55,7 @@ class MMAUnit(wiring.Component):
         for i in range(N):
             for j in range(N):
                 m.submodules[f"pe_{i}_{j}"] = pe[i][j]
+                m.d.comb += pe[i][j].acc_sel.eq(self.acc_d)
 
         a_tile = [[Signal(BFloat16, name=f"a_tile_{b}_{n}") for n in range(N * N)] for b in range(2)]
         b_tile = [[Signal(BFloat16, name=f"b_tile_{b}_{n}") for n in range(N * N)] for b in range(2)]

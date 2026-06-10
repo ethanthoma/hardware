@@ -100,18 +100,20 @@ def run_stream(A, B, kblocks: int, request, kblocks_encoded: int | None = None) 
     return captured["d"]
 
 
-def run_chain(ops, request) -> np.ndarray:
-    """Run [(A, B, kblocks, accumulate, evict), ...] on one DUT; only the evict op produces wr_data."""
+def run_chain(ops, request):
+    """Run [(A, B, kblocks, accumulate, evict, acc_d), ...] on one DUT.
+    Returns (evictions, flags): evicted tiles in op order, and (any_dropped, any_overflow) at each op's done."""
     dut = MMAUnit()
     slot_a, slot_b, slot_c = 8, 16, 32
-    captured: dict[str, np.ndarray] = {}
+    evictions: list[np.ndarray] = []
+    flags: list[tuple[bool, bool]] = []
 
     async def bench(ctx):
         ctx.set(dut.slot_a, slot_a)
         ctx.set(dut.slot_b, slot_b)
         ctx.set(dut.slot_c, slot_c)
 
-        for A, B, kblocks, accumulate, evict in ops:
+        for A, B, kblocks, accumulate, evict, acc_d in ops:
             a_tiles = split_into_kblocks(A, "a", kblocks)
             b_tiles = split_into_kblocks(B, "b", kblocks)
             a_mem = {slot_a + kb: pack_tile(a_tiles[kb]) for kb in range(kblocks)}
@@ -120,21 +122,26 @@ def run_chain(ops, request) -> np.ndarray:
             ctx.set(dut.kblocks, kblocks % 16)
             ctx.set(dut.accumulate, 1 if accumulate else 0)
             ctx.set(dut.evict, 1 if evict else 0)
+            ctx.set(dut.acc_d, acc_d)
             ctx.set(dut.start, 1)
 
+            evicted = None
             for _ in range(MAX_CYCLES):
                 ctx.set(dut.rd_data_a, a_mem.get(ctx.get(dut.rd_addr_a), 0))
                 ctx.set(dut.rd_data_b, b_mem.get(ctx.get(dut.rd_addr_b), 0))
                 if ctx.get(dut.wr_en):
-                    captured["d"] = unpack_tile(ctx.get(dut.wr_data))
+                    evicted = unpack_tile(ctx.get(dut.wr_data))
                 if ctx.get(dut.done):
                     break
                 await ctx.tick()
             assert ctx.get(dut.done), "op never completed"
+            flags.append((bool(ctx.get(dut.any_dropped)), bool(ctx.get(dut.any_overflow))))
+            if evicted is not None:
+                evictions.append(evicted)
             ctx.set(dut.start, 0)
             await ctx.tick()
 
-        assert "d" in captured, "chain produced no eviction"
+        assert evictions, "chain produced no eviction"
 
     sim = Simulator(dut)
     sim.add_clock(Period(us=1))
@@ -144,7 +151,7 @@ def run_chain(ops, request) -> np.ndarray:
             sim.run()
     else:
         sim.run()
-    return captured["d"]
+    return evictions, flags
 
 
 def assert_bit_exact(got, want):
@@ -244,11 +251,49 @@ def test_accumulate_chain_matches_single_mma(request):
     B = np.random.randn(K, N).astype(np.float32) * 0.2
     A_first, A_second = A[:, : N * 2], A[:, N * 2 :]
     B_first, B_second = B[: N * 2, :], B[N * 2 :, :]
-    chained = run_chain(
+    evictions, _ = run_chain(
         [
-            (A_first, B_first, 2, False, False),
-            (A_second, B_second, 2, True, True),
+            (A_first, B_first, 2, False, False, 0),
+            (A_second, B_second, 2, True, True, 0),
         ],
         request,
     )
-    assert_bit_exact(chained, bf16_matmul(A, B))
+    assert_bit_exact(evictions[0], bf16_matmul(A, B))
+
+
+def test_interleaved_chains_stay_independent(request):
+    # two accumulate chains interleaved op-by-op into acc0/acc1; each evict matches its own
+    # single-K=8-mma reference, proving the banks don't bleed into each other
+    np.random.seed(23)
+    K = N * 2
+    Ax = np.random.randn(N, K).astype(np.float32) * 0.2
+    Bx = np.random.randn(K, N).astype(np.float32) * 0.2
+    Ay = np.random.randn(N, K).astype(np.float32) * 0.2
+    By = np.random.randn(K, N).astype(np.float32) * 0.2
+    evictions, _ = run_chain(
+        [
+            (Ax[:, :N], Bx[:N, :], 1, False, False, 0),
+            (Ay[:, :N], By[:N, :], 1, False, False, 1),
+            (Ax[:, N:], Bx[N:, :], 1, True, True, 0),
+            (Ay[:, N:], By[N:, :], 1, True, True, 1),
+        ],
+        request,
+    )
+    assert_bit_exact(evictions[0], bf16_matmul(Ax, Bx))
+    assert_bit_exact(evictions[1], bf16_matmul(Ay, By))
+
+
+def test_flags_stick_per_acc_bank(request):
+    # an overflowing chain in acc1 must not contaminate acc0's sticky flags
+    ones = np.ones((N, N), dtype=np.float32)
+    hot_a, hot_b = ones * 128.0, ones * 64.0  # K=4 row of 2**13 products wraps signed(48)
+    _, flags = run_chain(
+        [
+            (ones * 0.25, ones * 0.25, 1, False, False, 0),
+            (hot_a, hot_b, 1, False, False, 1),
+            (ones * 0.25, ones * 0.25, 1, True, True, 0),
+        ],
+        request,
+    )
+    assert flags[1] == (False, True)
+    assert flags[2] == (False, False)

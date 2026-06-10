@@ -9,6 +9,7 @@ from rounder import Rounder
 
 BF16_BIAS = 127
 BF16_MANTISSA_BITS = 7
+ACC_BANKS = 4  # acc0..acc3 -- TODO (cc4 MMA.md): confirm 4 once the streaming kernel pattern is written
 
 
 def decomposed_layout(width: int) -> data.StructLayout:
@@ -67,6 +68,7 @@ class Accumulator(wiring.Component):
             {
                 "addend": In(signed(width)),
                 "addend_dropped": In(1),  # this addend was an out-of-window product forced to 0
+                "acc_sel": In(range(ACC_BANKS)),  # bank targeted by load/enable and read by value/result/flags
                 "load": In(1),
                 "enable": In(1),
                 "value": Out(signed(width)),
@@ -80,25 +82,28 @@ class Accumulator(wiring.Component):
     def elaborate(self, platform: Platform | None) -> Module:
         m = Module()
 
+        acc_bank = Array(Signal(signed(self.width), name=f"acc{n}") for n in range(ACC_BANKS))
+        dropped_bank = Array(Signal(name=f"dropped{n}") for n in range(ACC_BANKS))
+        overflow_bank = Array(Signal(name=f"overflow{n}") for n in range(ACC_BANKS))
+
         acc = Signal(signed(self.width))
+        m.d.comb += acc.eq(acc_bank[self.acc_sel])
         acc_next = Signal(signed(self.width + 1))
         m.d.comb += acc_next.eq(acc + self.addend)
         overflow = Signal()
         m.d.comb += overflow.eq(acc_next[self.width] != acc_next[self.width - 1])
 
-        any_dropped = Signal()
-        any_overflow = Signal()
         with m.If(self.load):
-            m.d.sync += acc.eq(self.addend)
-            m.d.sync += any_dropped.eq(self.addend_dropped)
-            m.d.sync += any_overflow.eq(0)
+            m.d.sync += acc_bank[self.acc_sel].eq(self.addend)
+            m.d.sync += dropped_bank[self.acc_sel].eq(self.addend_dropped)
+            m.d.sync += overflow_bank[self.acc_sel].eq(0)
         with m.Elif(self.enable):
-            m.d.sync += acc.eq(acc_next[: self.width])
-            m.d.sync += any_dropped.eq(any_dropped | self.addend_dropped)
-            m.d.sync += any_overflow.eq(any_overflow | overflow)
+            m.d.sync += acc_bank[self.acc_sel].eq(acc_next[: self.width])
+            m.d.sync += dropped_bank[self.acc_sel].eq(dropped_bank[self.acc_sel] | self.addend_dropped)
+            m.d.sync += overflow_bank[self.acc_sel].eq(overflow_bank[self.acc_sel] | overflow)
         m.d.comb += self.value.eq(acc)
-        m.d.comb += self.any_dropped.eq(any_dropped)
-        m.d.comb += self.any_overflow.eq(any_overflow)
+        m.d.comb += self.any_dropped.eq(dropped_bank[self.acc_sel])
+        m.d.comb += self.any_overflow.eq(overflow_bank[self.acc_sel])
 
         # drain_latch splits the drain across a register so the normalize+round runs the cycle
         # after acc settles, keeping it off the per-cycle MAC critical path (Fmax).

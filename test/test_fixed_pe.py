@@ -90,6 +90,43 @@ def test_accumulator_wrap_sets_overflow():
     assert overflow and not dropped
 
 
+def test_acc_sel_banks_independent():
+    # interleave two MAC chains into acc0/acc1, switching banks every cycle; the registered acc_sel
+    # must keep each in-flight addend with the bank it was presented for
+    dut = FixedPE()
+    out = {}
+
+    async def bench(ctx):
+        async def mac(a_val, b_val, load, sel):
+            sa, ea, ma = BF16.from_float(a_val).unpack()
+            sb, eb, mb = BF16.from_float(b_val).unpack()
+            ctx.set(dut.a, {"sign": sa, "exponent": ea, "mantissa": ma})
+            ctx.set(dut.b, {"sign": sb, "exponent": eb, "mantissa": mb})
+            ctx.set(dut.acc_sel, sel)
+            ctx.set(dut.load, 1 if load else 0)
+            ctx.set(dut.enable, 0 if load else 1)
+            await ctx.tick()
+
+        await mac(1.0, 2.0, True, 0)
+        await mac(10.0, 3.0, True, 1)
+        await mac(1.0, 1.0, False, 0)
+        await mac(2.0, 2.0, False, 1)
+        ctx.set(dut.load, 0)
+        ctx.set(dut.enable, 0)
+        for sel, key in ((0, "acc0"), (1, "acc1")):
+            ctx.set(dut.acc_sel, sel)
+            await ctx.tick()  # flush the last in-flight addend / retarget the drain
+            await ctx.tick()  # drain settles on the selected bank
+            r = ctx.get(dut.result)
+            out[key] = BF16.pack(r["sign"], r["exponent"], r["mantissa"]).to_float()
+
+    sim = Simulator(dut)
+    sim.add_clock(Period(us=1))
+    sim.add_testbench(bench)
+    sim.run()
+    assert out == {"acc0": 3.0, "acc1": 34.0}
+
+
 def drain_once_reference(pairs: list[tuple[float, float]]) -> float:
     """FixedPE's contract: bf16-truncate operands, accumulate exactly, RTNE-cast once."""
     acc = sum(BF16.from_float(a).to_float() * BF16.from_float(b).to_float() for a, b in pairs)

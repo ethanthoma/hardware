@@ -77,6 +77,7 @@ class FixedPE(wiring.Component):
 
     a: In(BFloat16)
     b: In(BFloat16)
+    acc_sel: In(2)
     load: In(1)
     enable: In(1)
     result: Out(BFloat16)
@@ -90,16 +91,19 @@ class FixedPE(wiring.Component):
 
         addend_r = Signal(signed(WIDTH))
         dropped_r = Signal()
+        acc_sel_r = Signal(2)
         load_r = Signal()
         enable_r = Signal()
         m.d.sync += addend_r.eq(addend)
         m.d.sync += dropped_r.eq(dropped)
+        m.d.sync += acc_sel_r.eq(self.acc_sel)
         m.d.sync += load_r.eq(self.load)
         m.d.sync += enable_r.eq(self.enable)
 
         m.submodules.acc = acc = Accumulator(width=WIDTH, lsb_exp=LSB_EXP)
         m.d.comb += acc.addend.eq(addend_r)
         m.d.comb += acc.addend_dropped.eq(dropped_r)
+        m.d.comb += acc.acc_sel.eq(acc_sel_r)
         m.d.comb += acc.load.eq(load_r)
         m.d.comb += acc.enable.eq(enable_r)
         m.d.comb += self.result.eq(acc.result)
