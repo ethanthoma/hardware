@@ -17,6 +17,9 @@ dev = ["pytest>=8.4.2"]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+package-dir = { "" = "src" }
+
 [tool.ruff]
 line-length = 120
 
@@ -29,16 +32,6 @@ fixable = ["ALL"]
 
 [tool.pytest.ini_options]
 markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
-
-[tool.pyright]
-venvPath = "."
-venv = ".venv"
-
-[tool.ty.environment]
-python = "./.venv/bin/python"
-
-[tool.uv]
-no-binary-package = ["numpy"]
 
 [tool.uv.sources]
 amaranth = { git = "https://github.com/amaranth-lang/amaranth.git" }
