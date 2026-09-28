@@ -1,6 +1,9 @@
+import json
 import re
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 from typing import Callable, NamedTuple
 
 from amaranth.back import rtlil
@@ -41,18 +44,23 @@ BLOCKS = [
 ]
 
 
-def synthesize(block: Block) -> str:
+class Synthesis(NamedTuple):
+    log: str
+    cell_count: int
+
+
+def synthesize(block: Block) -> Synthesis:
     il = rtlil.convert(block.build(), name=block.name)
-    script = f"read_rtlil <<rtlil\n{il}\nrtlil\nsynth -top {block.name} -flatten\nstat"
-    if block.combinational:
-        script += "\nabc -lut 6\nltp"
-    return run_yosys(script)
-
-
-def cell_count(yosys_output: str) -> int:
-    match = re.search(r"Number of cells:\s+(\d+)", yosys_output)
-    assert match, "synth produced no cell count"
-    return int(match.group(1))
+    with tempfile.TemporaryDirectory() as directory:
+        stat_path = Path(directory) / "stat.json"
+        script = f"read_rtlil <<rtlil\n{il}\nrtlil\nsynth -top {block.name} -flatten\ntee -q -o {stat_path} stat -json"
+        if block.combinational:
+            script += "\nabc -lut 6\nltp"
+        log = run_yosys(script)
+        cell_count = json.loads(stat_path.read_text())["design"]["num_cells"]
+    assert isinstance(cell_count, int), "yosys stat -json has no design.num_cells"
+    assert cell_count > 0, f"{block.name} synthesized to zero cells"
+    return Synthesis(log, cell_count)
 
 
 def lut_depth(yosys_output: str) -> int | None:
@@ -67,9 +75,9 @@ def main() -> None:
     for block in BLOCKS:
         if block.slow and not include_slow:
             continue
-        output = synthesize(block)
-        depth = lut_depth(output)
-        print(f"{block.name:<26}{cell_count(output):>8}{(str(depth) if depth is not None else '—'):>14}", flush=True)
+        synthesis = synthesize(block)
+        depth = lut_depth(synthesis.log)
+        print(f"{block.name:<26}{synthesis.cell_count:>8}{(str(depth) if depth is not None else '-'):>14}", flush=True)
 
 
 if __name__ == "__main__":
