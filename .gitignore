@@ -39,7 +39,8 @@
 !nix/*.nix
 
 !patches/
-!patches/**
+!patches/*.patch
+!patches/README.md
 
 !.cargo/
 !.cargo/config.toml

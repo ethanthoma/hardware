@@ -41,6 +41,7 @@
           };
 
           kani = import ./nix/kani.nix { inherit pkgs rust-bin; };
+          patchedCrates = import ./nix/patched-crates.nix { inherit pkgs; };
 
           python =
             let
@@ -54,6 +55,13 @@
         in
         {
           devshells.default = {
+            # Link nix-patched crates where Cargo.toml's [patch.crates-io] expects them.
+            devshell.startup.patched-crates.text = pkgs.lib.concatStrings (
+              pkgs.lib.mapAttrsToList (name: src: ''
+                ln -sfn ${src} "$PRJ_ROOT/patches/${name}"
+              '') patchedCrates
+            );
+
             packages = [
               inputs'.claude-code.packages.default
               pkgs.ruff

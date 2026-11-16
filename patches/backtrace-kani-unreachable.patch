@@ -1,0 +1,11 @@
+--- a/src/types.rs
++++ b/src/types.rs
+@@ -71,7 +71,7 @@
+                 return PathBuf::from(s);
+             }
+         }
+-        unreachable!()
++        ::core::unreachable!() // patched: bare `unreachable!` is ambiguous under Kani
+     }
+ }
+ 
