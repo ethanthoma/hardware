@@ -26,3 +26,20 @@
 
 !scripts/
 !scripts/*.sh
+
+!Cargo.toml
+!Cargo.lock
+!crates/
+!crates/*/
+!crates/*/Cargo.toml
+!crates/*/src/
+!crates/*/src/**/*.rs
+
+!nix/
+!nix/*.nix
+
+!patches/
+!patches/**
+
+!.cargo/
+!.cargo/config.toml

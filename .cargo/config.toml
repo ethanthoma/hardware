@@ -1,0 +1,3 @@
+[alias]
+# Kani with stubbing on (needed to stub RHDL trace hooks; see rounder.rs)
+verify = "kani -Z stubbing"

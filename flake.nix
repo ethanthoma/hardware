@@ -3,9 +3,22 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    devshell.url = "github:numtide/devshell";
-    claude-code.url = "github:sadjow/claude-code-nix";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+    devshell = {
+      url = "github:numtide/devshell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    claude-code = {
+      url = "github:sadjow/claude-code-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -19,6 +32,15 @@
       perSystem =
         { pkgs, inputs', ... }:
         let
+          rust-bin = inputs.rust-overlay.lib.mkRustBin { } pkgs;
+          rust = rust-bin.stable.latest.default.override {
+            extensions = [
+              "rust-src"
+              "rust-analyzer"
+            ];
+          };
+
+          kani = import ./nix/kani.nix { inherit pkgs rust-bin; };
 
           python =
             let
@@ -41,6 +63,8 @@
               pkgs.openblas
               pkgs.pkg-config
               pkgs.ninja
+              rust
+              kani
             ];
 
             env = [

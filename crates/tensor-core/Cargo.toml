@@ -1,0 +1,10 @@
+[package]
+name = "tensor-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rhdl.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
