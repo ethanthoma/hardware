@@ -1,0 +1,9 @@
+[package]
+name = "tops"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rhdl.workspace = true
+rhdl-fpga.workspace = true
+miette = "7"

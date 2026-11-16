@@ -73,6 +73,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "array-init"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d62b7694a562cdf5a74227903507c56ab2cc8bdd1f781ed5cb4cf9c9f810bfc"
+
+[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1093,6 +1099,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rhdl-fpga"
+version = "0.1.0"
+source = "git+https://github.com/samitbasu/rhdl?rev=c99d5cc53269a247bbc675d0fbd766991d409f56#c99d5cc53269a247bbc675d0fbd766991d409f56"
+dependencies = [
+ "anyhow",
+ "array-init",
+ "badascii-doc",
+ "quote",
+ "rand 0.9.5",
+ "rhdl",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "rhdl-macro"
 version = "0.0.3"
 source = "git+https://github.com/samitbasu/rhdl?rev=c99d5cc53269a247bbc675d0fbd766991d409f56#c99d5cc53269a247bbc675d0fbd766991d409f56"
@@ -1465,6 +1485,15 @@ dependencies = [
  "displaydoc",
  "serde_core",
  "zerovec",
+]
+
+[[package]]
+name = "tops"
+version = "0.1.0"
+dependencies = [
+ "miette",
+ "rhdl",
+ "rhdl-fpga",
 ]
 
 [[package]]

@@ -9,6 +9,7 @@ edition = "2024"
 
 [workspace.dependencies]
 rhdl = { git = "https://github.com/samitbasu/rhdl", rev = "c99d5cc53269a247bbc675d0fbd766991d409f56" }
+rhdl-fpga = { git = "https://github.com/samitbasu/rhdl", rev = "c99d5cc53269a247bbc675d0fbd766991d409f56" }
 
 [patch.crates-io]
 # Kani-compat: see patches/README.md

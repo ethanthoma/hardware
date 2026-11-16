@@ -42,6 +42,7 @@
 
           kani = import ./nix/kani.nix { inherit pkgs rust-bin; };
           patchedCrates = import ./nix/patched-crates.nix { inherit pkgs; };
+          bitstream = import ./nix/bitstream.nix { inherit pkgs rust patchedCrates; };
 
           python =
             let
@@ -54,11 +55,16 @@
             pkgs.${packageName} or pkgs.python314;
         in
         {
+          packages = bitstream.bitstreams // { inherit (bitstream) verilog; };
+
           devshells.default = {
             # Link nix-patched crates where Cargo.toml's [patch.crates-io] expects them.
             devshell.startup.patched-crates.text = pkgs.lib.concatStrings (
               pkgs.lib.mapAttrsToList (name: src: ''
-                ln -sfn ${src} "$PRJ_ROOT/patches/${name}"
+                # PRJ_ROOT is wherever the shell was entered; only link inside this repo.
+                if [ -d "$PRJ_ROOT/patches" ]; then
+                  ln -sfn ${src} "$PRJ_ROOT/patches/${name}"
+                fi
               '') patchedCrates
             );
 
@@ -71,6 +77,7 @@
               pkgs.openblas
               pkgs.pkg-config
               pkgs.ninja
+              pkgs.iverilog
               rust
               kani
             ];

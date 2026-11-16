@@ -33,6 +33,7 @@
 !crates/*/
 !crates/*/Cargo.toml
 !crates/*/src/
+!crates/*/src/**/
 !crates/*/src/**/*.rs
 
 !nix/
@@ -44,3 +45,6 @@
 
 !.cargo/
 !.cargo/config.toml
+
+!boards/
+!boards/*.lpf
