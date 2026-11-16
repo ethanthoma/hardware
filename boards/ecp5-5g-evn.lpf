@@ -21,3 +21,11 @@ IOBUF PORT "led[4]" IO_TYPE=LVCMOS25;
 IOBUF PORT "led[5]" IO_TYPE=LVCMOS25;
 IOBUF PORT "led[6]" IO_TYPE=LVCMOS25;
 IOBUF PORT "led[7]" IO_TYPE=LVCMOS25;
+
+# UART to a Raspberry Pi plugged into the 40-pin header on the underside
+# (JP8). Pi pin 8 = GPIO14/TXD -> FPGA P18; Pi pin 10 = GPIO15/RXD <- FPGA N20.
+# On the Pi this is /dev/serial0 (enable with raspi-config > Serial Port).
+LOCATE COMP "uart_tx" SITE "N20";
+IOBUF PORT "uart_tx" IO_TYPE=LVCMOS33;
+LOCATE COMP "uart_rx" SITE "P18";
+IOBUF PORT "uart_rx" IO_TYPE=LVCMOS33 PULLMODE=UP;

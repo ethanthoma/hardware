@@ -824,6 +824,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e6eb142958d64335fb0e345c5b9ead2ecd6fc438c307e9d7d3c4fd428dbaf12"
 
 [[package]]
+name = "periph"
+version = "0.1.0"
+dependencies = [
+ "miette",
+ "rhdl",
+ "rhdl-fpga",
+]
+
+[[package]]
 name = "petgraph"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1492,6 +1501,7 @@ name = "tops"
 version = "0.1.0"
 dependencies = [
  "miette",
+ "periph",
  "rhdl",
  "rhdl-fpga",
 ]

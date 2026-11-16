@@ -42,7 +42,8 @@
 
           kani = import ./nix/kani.nix { inherit pkgs rust-bin; };
           patchedCrates = import ./nix/patched-crates.nix { inherit pkgs; };
-          bitstream = import ./nix/bitstream.nix { inherit pkgs rust patchedCrates; };
+          rustBuild = import ./nix/rust.nix { inherit pkgs rust patchedCrates; };
+          bitstream = import ./nix/bitstream.nix { inherit pkgs rustBuild; };
 
           python =
             let
@@ -56,6 +57,10 @@
         in
         {
           packages = bitstream.bitstreams // { inherit (bitstream) verilog; };
+          checks = import ./nix/checks.nix {
+            inherit pkgs rustBuild kani;
+            inherit (bitstream) bitstreams;
+          };
 
           devshells.default = {
             # Link nix-patched crates where Cargo.toml's [patch.crates-io] expects them.

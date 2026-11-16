@@ -1,69 +1,33 @@
 # Reproducible bitstreams: RHDL top -> Verilog -> yosys -> nextpnr -> ecppack.
 #
-#   nix build .#blink     # result/top.bit (+ top.v, top.json, top.config, logs)
+#   nix build .#hello     # result/top.bit (+ top.v, top.json, top.config, logs)
 #   nix build .#verilog   # result/<top>.v for every top in crates/tops
-{
-  pkgs,
-  rust,
-  patchedCrates,
-}:
+{ pkgs, rustBuild }:
 let
   lib = pkgs.lib;
-  root = ../.;
-
-  rustPlatform = pkgs.makeRustPlatform {
-    cargo = rust;
-    rustc = rust;
-  };
 
   # Builds the exporter and runs it in the same derivation. RHDL's #[kernel]
   # macro bakes absolute source paths into the binary and re-reads those files
   # at export time, so the export has to happen while the build tree exists.
-  verilog = rustPlatform.buildRustPackage {
-    pname = "verilog";
-    version = "0.1.0";
-
-    # Only Rust sources go in, so Python/doc edits don't rebuild it.
-    src = lib.fileset.toSource {
-      inherit root;
-      fileset = lib.fileset.unions [
-        ../Cargo.toml
-        ../Cargo.lock
-        ../crates
+  verilog = rustBuild.rustPlatform.buildRustPackage (
+    rustBuild.common
+    // {
+      pname = "verilog";
+      cargoBuildFlags = [
+        "-p"
+        "tops"
+        "--bin"
+        "export-verilog"
       ];
-    };
-
-    cargoLock = {
-      lockFile = ../Cargo.lock;
-      outputHashes."rhdl-0.1.0" = "sha256-BV64X4lV93KIvt0TWxJr8D3PfJZCc/B9ukBmtim/bI8=";
-    };
-
-    # Same patched crates the devshell links in; see patches/README.md.
-    postPatch = lib.concatStrings (
-      lib.mapAttrsToList (name: src: ''
-        mkdir -p patches
-        ln -s ${src} patches/${name}
-      '') patchedCrates
-    );
-
-    cargoBuildFlags = [
-      "-p"
-      "tops"
-      "--bin"
-      "export-verilog"
-    ];
-    doCheck = false;
-
-    nativeBuildInputs = [ pkgs.iverilog ]; # rhdl validates exported Verilog with iverilog
-
-    installPhase = ''
-      runHook preInstall
-      mkdir -p $out
-      target/*/release/export-verilog --all $out \
-        || target/release/export-verilog --all $out
-      runHook postInstall
-    '';
-  };
+      doCheck = false;
+      installPhase = ''
+        runHook preInstall
+        mkdir -p $out
+        $(find target -path '*/release/export-verilog' -type f | head -1) --all $out
+        runHook postInstall
+      '';
+    }
+  );
 
   boards = {
     ecp5-5g-evn = {
@@ -102,6 +66,7 @@ let
         cd $out
         cp ${verilog}/${top}.v top.v
         yosys -q -l yosys.log -p "synth_ecp5 -top top -json top.json" top.v
+        # nextpnr exits non-zero if any clock misses its constraint.
         nextpnr-ecp5 -q -l nextpnr.log \
           ${lib.escapeShellArgs b.nextpnrArgs} \
           --seed ${toString seed} \
@@ -113,8 +78,8 @@ in
   inherit verilog mkBitstream;
 
   bitstreams = {
-    blink = mkBitstream {
-      top = "blink";
+    hello = mkBitstream {
+      top = "hello";
       board = "ecp5-5g-evn";
     };
   };

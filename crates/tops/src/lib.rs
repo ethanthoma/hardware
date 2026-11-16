@@ -3,7 +3,7 @@
 
 use rhdl::prelude::*;
 
-pub mod blink;
+pub mod hello;
 
 /// A top that can be exported as Verilog for a board.
 pub struct Top {
@@ -12,6 +12,6 @@ pub struct Top {
 }
 
 pub const TOPS: &[Top] = &[Top {
-    name: "blink",
-    build: blink::fixture,
+    name: "hello",
+    build: hello::fixture,
 }];

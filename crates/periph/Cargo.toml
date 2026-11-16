@@ -1,0 +1,11 @@
+[package]
+name = "periph"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rhdl.workspace = true
+rhdl-fpga.workspace = true
+
+[dev-dependencies]
+miette = "7"

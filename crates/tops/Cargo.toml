@@ -7,3 +7,4 @@ edition.workspace = true
 rhdl.workspace = true
 rhdl-fpga.workspace = true
 miette = "7"
+periph = { path = "../periph" }

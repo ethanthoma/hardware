@@ -23,6 +23,6 @@ fn main() -> miette::Result<()> {
             };
             export(top, out)
         }
-        _ => bail!("usage: export-verilog <top> <out.v> | --all <dir>"),
+        _ => Err(miette::miette!("usage: export-verilog <top> <out.v> | --all <dir>")),
     }
 }
