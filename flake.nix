@@ -5,6 +5,7 @@
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     devshell.url = "github:numtide/devshell";
+    claude-code.url = "github:sadjow/claude-code-nix";
   };
 
   outputs =
@@ -16,7 +17,7 @@
       systems = [ "x86_64-linux" ];
 
       perSystem =
-        { pkgs, ... }:
+        { pkgs, inputs', ... }:
         let
 
           python =
@@ -32,6 +33,7 @@
         {
           devshells.default = {
             packages = [
+              inputs'.claude-code.packages.default
               pkgs.ruff
               pkgs.yamlfmt
               pkgs.pyrefly
