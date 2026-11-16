@@ -4,7 +4,7 @@ from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
 from accumulator import Accumulator
-from bfloat16 import BFloat16
+from bfloat16 import BFloat16, Float32
 from carry_select_adder import CarrySelectAdder
 from mantissa_multiplier import MantissaMultiplier
 
@@ -71,16 +71,19 @@ class FixedMAC(wiring.Component):
 
 
 class FixedPE(wiring.Component):
-    """Registered PE: pipelined multiply+align, accumulate, drain to bf16. The addend and its
+    """Registered PE: pipelined multiply+align, accumulate, drain to bf16 and fp32. The addend and its
     control register one cycle ahead of the add, so the per-cycle loop is just `acc + addend` and the
-    operands accumulate one cycle behind their presentation (consumers flush a trailing cycle)."""
+    operands accumulate one cycle behind their presentation (consumers flush a trailing cycle). `acc_sel`
+    picks the bank being accumulated; `drain_sel` independently picks the bank being drained."""
 
     a: In(BFloat16)
     b: In(BFloat16)
     acc_sel: In(2)
+    drain_sel: In(2)
     load: In(1)
     enable: In(1)
     result: Out(BFloat16)
+    result_fp32: Out(Float32)
     result_valid: Out(1)
     any_dropped: Out(1)
     any_overflow: Out(1)
@@ -106,7 +109,9 @@ class FixedPE(wiring.Component):
         m.d.comb += acc.acc_sel.eq(acc_sel_r)
         m.d.comb += acc.load.eq(load_r)
         m.d.comb += acc.enable.eq(enable_r)
+        m.d.comb += acc.drain_sel.eq(self.drain_sel)
         m.d.comb += self.result.eq(acc.result)
+        m.d.comb += self.result_fp32.eq(acc.result_fp32)
         m.d.comb += self.result_valid.eq(acc.result_valid)
         m.d.comb += self.any_dropped.eq(acc.any_dropped)
         m.d.comb += self.any_overflow.eq(acc.any_overflow)

@@ -114,7 +114,7 @@ def test_acc_sel_banks_independent():
         ctx.set(dut.load, 0)
         ctx.set(dut.enable, 0)
         for sel, key in ((0, "acc0"), (1, "acc1")):
-            ctx.set(dut.acc_sel, sel)
+            ctx.set(dut.drain_sel, sel)
             await ctx.tick()  # flush the last in-flight addend / retarget the drain
             await ctx.tick()  # drain settles on the selected bank
             r = ctx.get(dut.result)
@@ -190,3 +190,43 @@ def test_window_sweep(capsys):
 
     drifts = [(exp, want, got) for exp, want, got, _ in rows if got != want and got != 0.0]
     assert not drifts, f"unexpected drift: {drifts}"
+
+
+def fp32_rtne(x: float) -> float:
+    return struct.unpack("<f", struct.pack("<f", x))[0]
+
+
+def run_fixed_pe_fp32(pairs: list[tuple[float, float]]) -> float:
+    dut = FixedPE()
+    captured: dict[str, float] = {}
+
+    async def bench(ctx):
+        for i, (a_val, b_val) in enumerate(pairs):
+            sa, ea, ma = BF16.from_float(a_val).unpack()
+            sb, eb, mb = BF16.from_float(b_val).unpack()
+            ctx.set(dut.a, {"sign": sa, "exponent": ea, "mantissa": ma})
+            ctx.set(dut.b, {"sign": sb, "exponent": eb, "mantissa": mb})
+            ctx.set(dut.load, 1 if i == 0 else 0)
+            ctx.set(dut.enable, 0 if i == 0 else 1)
+            await ctx.tick()
+        ctx.set(dut.load, 0)
+        ctx.set(dut.enable, 0)
+        await ctx.tick()  # flush the pipelined addend into acc
+        await ctx.tick()  # drain is pipelined one cycle behind acc
+        r = ctx.get(dut.result_fp32)
+        bits = (r["sign"] << 31) | (r["exponent"] << 23) | r["mantissa"]
+        captured["result"] = struct.unpack("<f", struct.pack("<I", bits))[0]
+
+    sim = Simulator(dut)
+    sim.add_clock(Period(us=1))
+    sim.add_testbench(bench)
+    sim.run()
+    return captured["result"]
+
+
+def test_in_window_fp32_drain_matches_single_round():
+    rng = random.Random(0xACC)
+    for _ in range(8):
+        pairs = [(rng.uniform(-4, 4), rng.uniform(-4, 4)) for _ in range(16)]
+        exact = sum(BF16.from_float(a).to_float() * BF16.from_float(b).to_float() for a, b in pairs)
+        assert run_fixed_pe_fp32(pairs) == fp32_rtne(exact)

@@ -16,6 +16,12 @@ class BFloat16(data.Struct):
         return self.exponent == 0
 
 
+class Float32(data.Struct):
+    mantissa: 23
+    exponent: 8
+    sign: 1
+
+
 class BF16:
     def __init__(self, bits: int):
         self.bits = bits

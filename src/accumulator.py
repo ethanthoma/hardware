@@ -3,12 +3,11 @@ from amaranth.build import Platform
 from amaranth.lib import data, wiring
 from amaranth.lib.wiring import In, Out
 
-from bfloat16 import BFloat16
+from bfloat16 import BFloat16, Float32
 from normalizer import Normalizer
 from rounder import Rounder
 
-BF16_BIAS = 127
-BF16_MANTISSA_BITS = 7
+FLOAT_BIAS = 127  # bf16 and fp32 share the 8-bit, bias-127 exponent
 ACC_BANKS = 4  # acc0..acc3 -- TODO (cc4 MMA.md): confirm 4 once the streaming kernel pattern is written
 
 
@@ -28,29 +27,39 @@ def decompose(m: Module, value: Signal):
     return out
 
 
-def round_to_bf16(m: Module, d: data.View, lsb_exp: int):
-    """Drain stage 2: normalize |acc| to 1.x, round-to-nearest-even, assemble the bf16."""
+def normalize(m: Module, d: data.View) -> Value:
+    """Drain stage 2a: shift |acc| so its leading one lands on the top bit."""
     width = len(d.magnitude)
     m.submodules.normalizer = normalizer = Normalizer(width=width)
     m.d.comb += normalizer.value_in.eq(d.magnitude)
     m.d.comb += normalizer.shift_amount.eq(width - 1 - d.leading_one)
-    normalized = normalizer.value_out
+    return normalizer.value_out
 
-    mantissa_lo = width - 1 - BF16_MANTISSA_BITS
-    m.submodules.rounder = rounder = Rounder(width=BF16_MANTISSA_BITS)
-    m.d.comb += rounder.mantissa_in.eq(normalized[mantissa_lo : width - 1])
-    m.d.comb += rounder.guard.eq(normalized[mantissa_lo - 1])
-    m.d.comb += rounder.round_bit.eq(normalized[mantissa_lo - 2])
-    m.d.comb += rounder.sticky.eq(normalized[0 : mantissa_lo - 2].any())
 
-    exponent = Signal(signed(12))
-    m.d.comb += exponent.eq(lsb_exp + d.leading_one + BF16_BIAS + rounder.overflow)
+def round_to_float(m: Module, d: data.View, normalized: Value, lsb_exp: int, layout):
+    """Drain stage 2b: round the normalized magnitude to `layout`'s mantissa (RTNE) and assemble that float."""
+    fields = data.Layout.cast(layout)
+    exponent_bits = Shape.cast(fields["exponent"].shape).width
+    mantissa_bits = Shape.cast(fields["mantissa"].shape).width
+    assert exponent_bits == 8, "exponent math assumes the 8-bit bias-127 exponent"
+    assert mantissa_bits > 0, "a float layout needs a mantissa"
+    padding_bits = max(0, mantissa_bits + 3 - len(normalized))  # zeros below the LSB: exact for narrow widths
+    padded = Cat(Const(0, padding_bits), normalized)
+    width = len(padded)
 
-    result = Signal(BFloat16)
+    mantissa_lo = width - 1 - mantissa_bits
+    m.submodules[f"rounder_{mantissa_bits}"] = rounder = Rounder(width=mantissa_bits)
+    m.d.comb += rounder.mantissa_in.eq(padded[mantissa_lo : width - 1])
+    m.d.comb += rounder.guard.eq(padded[mantissa_lo - 1])
+    m.d.comb += rounder.round_bit.eq(padded[mantissa_lo - 2])
+    m.d.comb += rounder.sticky.eq(padded[0 : mantissa_lo - 2].any())
+
+    exponent = Signal(signed(12), name=f"exponent_{mantissa_bits}")
+    m.d.comb += exponent.eq(lsb_exp + d.leading_one + FLOAT_BIAS + rounder.overflow)
+
+    result = Signal(layout, name=f"result_{mantissa_bits}")
     with m.If(d.magnitude == 0):
-        m.d.comb += result.sign.eq(0)
-        m.d.comb += result.exponent.eq(0)
-        m.d.comb += result.mantissa.eq(0)
+        m.d.comb += result.as_value().eq(0)
     with m.Else():
         m.d.comb += result.sign.eq(d.sign)
         m.d.comb += result.exponent.eq(exponent[0:8])
@@ -59,8 +68,12 @@ def round_to_bf16(m: Module, d: data.View, lsb_exp: int):
 
 
 class Accumulator(wiring.Component):
+    """Wide fixed-point accumulator, banked x4. Writes (load/enable) target `acc_sel`; the drain and every
+    read-side output (`value`, `result`, `result_fp32`, flags, `result_valid`) follow `drain_sel`, so one bank
+    can drain while another accumulates."""
+
     def __init__(self, width: int = 64, lsb_exp: int = 0):
-        assert width >= BF16_MANTISSA_BITS + 3  # implicit 1 + mantissa + guard + round
+        assert width >= 2, "a signed accumulator needs a sign bit and a magnitude bit"
         self.width = width
         self.lsb_exp = lsb_exp
 
@@ -68,12 +81,14 @@ class Accumulator(wiring.Component):
             {
                 "addend": In(signed(width)),
                 "addend_dropped": In(1),  # this addend was an out-of-window product forced to 0
-                "acc_sel": In(range(ACC_BANKS)),  # bank targeted by load/enable and read by value/result/flags
+                "acc_sel": In(range(ACC_BANKS)),  # bank written by load/enable
+                "drain_sel": In(range(ACC_BANKS)),  # bank read by value/result/result_fp32/flags
                 "load": In(1),
                 "enable": In(1),
                 "value": Out(signed(width)),
                 "result": Out(BFloat16),
-                "result_valid": Out(1),
+                "result_fp32": Out(Float32),
+                "result_valid": Out(1),  # result/result_fp32 reflect drain_sel's bank, settled
                 "any_dropped": Out(1),  # sticky: some addend in this accumulation was dropped
                 "any_overflow": Out(1),  # sticky: the accumulator wrapped past signed range
             }
@@ -101,15 +116,27 @@ class Accumulator(wiring.Component):
             m.d.sync += acc_bank[self.acc_sel].eq(acc_next[: self.width])
             m.d.sync += dropped_bank[self.acc_sel].eq(dropped_bank[self.acc_sel] | self.addend_dropped)
             m.d.sync += overflow_bank[self.acc_sel].eq(overflow_bank[self.acc_sel] | overflow)
-        m.d.comb += self.value.eq(acc)
-        m.d.comb += self.any_dropped.eq(dropped_bank[self.acc_sel])
-        m.d.comb += self.any_overflow.eq(overflow_bank[self.acc_sel])
+
+        drained = Signal(signed(self.width))
+        m.d.comb += drained.eq(acc_bank[self.drain_sel])
+        m.d.comb += self.value.eq(drained)
+        m.d.comb += self.any_dropped.eq(dropped_bank[self.drain_sel])
+        m.d.comb += self.any_overflow.eq(overflow_bank[self.drain_sel])
 
         # drain_latch splits the drain across a register so the normalize+round runs the cycle
         # after acc settles, keeping it off the per-cycle MAC critical path (Fmax).
         drain_latch = Signal(decomposed_layout(self.width))
-        m.d.sync += drain_latch.eq(decompose(m, acc))
-        m.d.comb += self.result.eq(round_to_bf16(m, drain_latch, self.lsb_exp))
-        m.d.sync += self.result_valid.eq(~(self.load | self.enable))
+        m.d.sync += drain_latch.eq(decompose(m, drained))
+        normalized = normalize(m, drain_latch)
+        m.d.comb += self.result.eq(round_to_float(m, drain_latch, normalized, self.lsb_exp, BFloat16))
+        m.d.comb += self.result_fp32.eq(round_to_float(m, drain_latch, normalized, self.lsb_exp, Float32))
+
+        drained_bank_written = Signal()
+        m.d.comb += drained_bank_written.eq((self.load | self.enable) & (self.acc_sel == self.drain_sel))
+        latched_settled = Signal()
+        latched_drain_sel = Signal.like(self.drain_sel)
+        m.d.sync += latched_settled.eq(~drained_bank_written)
+        m.d.sync += latched_drain_sel.eq(self.drain_sel)
+        m.d.comb += self.result_valid.eq(latched_settled & (latched_drain_sel == self.drain_sel))
 
         return m

@@ -7,6 +7,8 @@ from fixed_pe import FixedPE
 
 N = 4
 TILE_BITS = N * N * 16  # one 4x4 BF16 sub-block per D-SRAM slot
+FP32_TILE_BITS = N * N * 32  # one 4x4 FP32 accumulator tile register (a0..a7)
+ACC_TILE_REGISTERS = 8
 MAX_KBLOCKS = 16
 
 
@@ -21,8 +23,20 @@ class State(enum.Enum, shape=3):
     DONE = 7
 
 
+class AccReadState(enum.Enum, shape=2):
+    IDLE = 0
+    CAPTURE = 1  # point the shared drain at the bank; waits while an mma owns the drain (its DRAIN cycle)
+    WRITE = 2  # the drain latch holds the bank: write its fp32 tile to the tile register file
+    DONE = 3
+
+
 class MMAUnit(wiring.Component):
-    """K-block streaming MMA, double-buffered tile fetch, K = 4 * kblocks (kblocks=0 means 16)."""
+    """K-block streaming MMA, double-buffered tile fetch, K = 4 * kblocks (kblocks=0 means 16).
+
+    `acc_read` runs beside the mma FSM: it drains one accumulator bank at full precision into an fp32 tile
+    register while an mma accumulates into another bank. The software epilogue (scale, bias/residual,
+    activation, cast) then runs on that tile register. The caller (the core's scoreboard) must not
+    acc_read the bank an in-flight mma is accumulating into."""
 
     def __init__(self):
         super().__init__(
@@ -43,8 +57,16 @@ class MMAUnit(wiring.Component):
                 "wr_addr": Out(6),
                 "wr_data": Out(TILE_BITS),
                 "wr_en": Out(1),
-                "any_dropped": Out(1),  # sticky for the selected acc_d chain: a product was out-of-window
-                "any_overflow": Out(1),  # sticky for the selected acc_d chain: an accumulator wrapped
+                "acc_read_start": In(1),
+                "acc_read_bank": In(2),  # acc0..acc3; held stable from acc_read_start to acc_read_done
+                "acc_read_target": In(range(ACC_TILE_REGISTERS)),  # a0..a7
+                "acc_read_done": Out(1),
+                "tile_wr_addr": Out(range(ACC_TILE_REGISTERS)),
+                "tile_wr_data": Out(FP32_TILE_BITS),
+                "tile_wr_en": Out(1),
+                # Sticky flags of the drained bank: acc_read_bank while an acc_read is in flight, else acc_d.
+                "any_dropped": Out(1),  # a product was out-of-window
+                "any_overflow": Out(1),  # an accumulator wrapped
             }
         )
 
@@ -57,10 +79,22 @@ class MMAUnit(wiring.Component):
                 m.submodules[f"pe_{i}_{j}"] = pe[i][j]
                 m.d.comb += pe[i][j].acc_sel.eq(self.acc_d)
 
+        state = Signal(State)
+        acc_read_state = Signal(AccReadState)
+        drain_sel = Signal(2)
+        with m.If(state == State.DRAIN):
+            m.d.comb += drain_sel.eq(self.acc_d)
+        with m.Elif(acc_read_state != AccReadState.IDLE):
+            m.d.comb += drain_sel.eq(self.acc_read_bank)
+        with m.Else():
+            m.d.comb += drain_sel.eq(self.acc_d)
+        for i in range(N):
+            for j in range(N):
+                m.d.comb += pe[i][j].drain_sel.eq(drain_sel)
+
         a_tile = [[Signal(BFloat16, name=f"a_tile_{b}_{n}") for n in range(N * N)] for b in range(2)]
         b_tile = [[Signal(BFloat16, name=f"b_tile_{b}_{n}") for n in range(N * N)] for b in range(2)]
 
-        state = Signal(State)
         # +1 width so kb_mac / kb_end can hold MAX_KBLOCKS (16) when kblocks==0
         kb_mac = Signal(range(MAX_KBLOCKS + 1))
         kb_end = Signal(range(MAX_KBLOCKS + 1))
@@ -154,7 +188,6 @@ class MMAUnit(wiring.Component):
                 m.d.sync += state.eq(State.EVICT)
 
             with m.Case(State.EVICT):
-                # TODO: epilogue (add_en + slot_c read; scale_en; act_sel) -- currently round-and-write only
                 set_all(load=0, enable=0)
                 m.d.comb += self.wr_addr.eq(self.slot_c)
                 m.d.comb += self.wr_en.eq(1)
@@ -168,6 +201,29 @@ class MMAUnit(wiring.Component):
                 m.d.comb += self.done.eq(1)
                 with m.If(~self.start):
                     m.d.sync += state.eq(State.IDLE)
+
+        with m.Switch(acc_read_state):
+            with m.Case(AccReadState.IDLE):
+                with m.If(self.acc_read_start):
+                    m.d.sync += acc_read_state.eq(AccReadState.CAPTURE)
+
+            with m.Case(AccReadState.CAPTURE):
+                with m.If(state != State.DRAIN):
+                    m.d.sync += acc_read_state.eq(AccReadState.WRITE)
+
+            with m.Case(AccReadState.WRITE):
+                m.d.comb += self.tile_wr_addr.eq(self.acc_read_target)
+                m.d.comb += self.tile_wr_en.eq(1)
+                for i in range(N):
+                    for j in range(N):
+                        n = i * N + j
+                        m.d.comb += self.tile_wr_data[n * 32 : (n + 1) * 32].eq(pe[i][j].result_fp32.as_value())
+                m.d.sync += acc_read_state.eq(AccReadState.DONE)
+
+            with m.Case(AccReadState.DONE):
+                m.d.comb += self.acc_read_done.eq(1)
+                with m.If(~self.acc_read_start):
+                    m.d.sync += acc_read_state.eq(AccReadState.IDLE)
 
         m.d.comb += self.any_dropped.eq(Cat(pe[i][j].any_dropped for i in range(N) for j in range(N)).any())
         m.d.comb += self.any_overflow.eq(Cat(pe[i][j].any_overflow for i in range(N) for j in range(N)).any())
