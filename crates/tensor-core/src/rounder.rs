@@ -51,29 +51,22 @@ pub fn spec(m: u8, g: bool, r: bool, s: bool) -> u8 {
 mod proofs {
     use super::*;
 
-    // #[kernel] wraps every kernel in RHDL's thread-local trace-path hooks.
-    // They're simulation bookkeeping with no effect on the result, and their
-    // internals crash kani-compiler (ICE in intrinsics.rs), so stub them out.
-    fn no_push(_: &'static str) {}
-    fn no_pop() {}
+    kernel_proof! {
+        fn round_nearest_even_matches_spec() {
+            let m: u8 = kani::any();
+            kani::assume(m < 0x80);
+            let (g, r, s): (bool, bool, bool) = (kani::any(), kani::any(), kani::any());
 
-    #[kani::proof]
-    #[kani::stub(rhdl::core::trace_push_path, no_push)]
-    #[kani::stub(rhdl::core::trace_pop_path, no_pop)]
-    fn round_nearest_even_matches_spec() {
-        let m: u8 = kani::any();
-        kani::assume(m < 0x80);
-        let (g, r, s): (bool, bool, bool) = (kani::any(), kani::any(), kani::any());
+            let out = round_nearest_even(RoundIn {
+                mantissa: b7(m as u128),
+                guard: g,
+                round_bit: r,
+                sticky: s,
+            });
+            let got = ((out.overflow as u8) << 7) | out.mantissa.raw() as u8;
 
-        let out = round_nearest_even(RoundIn {
-            mantissa: b7(m as u128),
-            guard: g,
-            round_bit: r,
-            sticky: s,
-        });
-        let got = ((out.overflow as u8) << 7) | out.mantissa.raw() as u8;
-
-        assert_eq!(got, spec(m, g, r, s));
+            assert_eq!(got, spec(m, g, r, s));
+        }
     }
 
     /// Spec sanity: result is within half an ulp, and ties land on even.
